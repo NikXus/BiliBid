@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 app.use(express.static(path.join(__dirname)));
 
 /* ==============================
@@ -27,23 +28,26 @@ app.get("/", (req, res) => {
 /* ==============================
    MONGODB CONNECTION
 ============================== */
+
 mongoose.set("strictQuery", true);
 
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected Successfully"))
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+  })
   .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err.message);
     process.exit(1);
   });
 
-mongoose.connection.on("error", (err) => {
-  console.error("❌ MongoDB Runtime Error:", err);
-});
-
 /* ==============================
    SCHEMAS
 ============================== */
+
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true },
@@ -78,74 +82,86 @@ const Auction = mongoose.model("Auction", auctionSchema);
    USER ROUTES
 ============================== */
 
-// REGISTER
+/* REGISTER */
 app.post("/api/register", async (req, res) => {
   try {
-    console.log("Register request:", req.body);
-
     const { username, email, password } = req.body;
 
     if (!username || !email || !password) {
-      return res.status(400).json({ message: "All fields are required." });
+      return res.status(400).json({
+        message: "Username, email and password are required",
+      });
     }
 
-    const existingUser = await User.findOne({
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    const existing = await User.findOne({
       $or: [{ email }, { username }],
     });
 
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists." });
+    if (existing) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
-    const newUser = await User.create({
+    const user = await User.create({
       username,
       email,
-      password: hashedPassword,
+      password: hashed,
     });
 
-    console.log("User saved:", newUser);
-
     res.status(201).json({
-      message: "Account created successfully!",
+      message: "Account created successfully",
       user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
+        id: user._id,
+        username: user.username,
+        email: user.email,
       },
     });
   } catch (err) {
     console.error("Register error:", err);
-    res.status(500).json({ message: "Server error during registration." });
+    res.status(500).json({
+      message: "Registration failed",
+    });
   }
 });
 
-// LOGIN
+/* LOGIN */
 app.post("/api/login", async (req, res) => {
   try {
-    console.log("Login request:", req.body);
-
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "All fields are required." });
+      return res.status(400).json({
+        message: "Email and password required",
+      });
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials." });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password);
 
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials." });
+    if (!match) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
     res.json({
-      message: "Login successful!",
+      message: "Login successful",
       user: {
         id: user._id,
         username: user.username,
@@ -154,7 +170,9 @@ app.post("/api/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ message: "Server error during login." });
+    res.status(500).json({
+      message: "Login failed",
+    });
   }
 });
 
@@ -162,26 +180,30 @@ app.post("/api/login", async (req, res) => {
    AUCTION ROUTES
 ============================== */
 
-// GET all auctions
+/* GET ALL AUCTIONS */
 app.get("/api/auctions", async (req, res) => {
   try {
     const auctions = await Auction.find();
     res.json(auctions);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch auctions." });
+    res.status(500).json({
+      message: "Failed to fetch auctions",
+    });
   }
 });
 
-// CREATE auction
+/* CREATE AUCTION */
 app.post("/api/create-auction", async (req, res) => {
   try {
     const { title, startingPrice, duration } = req.body;
 
     if (!title || !startingPrice || !duration) {
-      return res.status(400).json({ message: "Missing auction fields." });
+      return res.status(400).json({
+        message: "Missing auction fields",
+      });
     }
 
-    const newAuction = await Auction.create({
+    const auction = await Auction.create({
       title,
       startingPrice: Number(startingPrice),
       currentBid: Number(startingPrice),
@@ -191,16 +213,18 @@ app.post("/api/create-auction", async (req, res) => {
     });
 
     res.status(201).json({
-      message: "Auction created!",
-      auction: newAuction,
+      message: "Auction created",
+      auction,
     });
   } catch (err) {
     console.error("Create auction error:", err);
-    res.status(500).json({ message: "Failed to create auction." });
+    res.status(500).json({
+      message: "Failed to create auction",
+    });
   }
 });
 
-// PLACE BID
+/* PLACE BID */
 app.post("/api/place-bid/:id", async (req, res) => {
   try {
     const { bidderName, bidAmount } = req.body;
@@ -208,11 +232,15 @@ app.post("/api/place-bid/:id", async (req, res) => {
     const auction = await Auction.findById(req.params.id);
 
     if (!auction) {
-      return res.status(404).json({ message: "Auction not found." });
+      return res.status(404).json({
+        message: "Auction not found",
+      });
     }
 
     if (Date.now() > auction.endsAt) {
-      return res.status(400).json({ message: "Auction ended." });
+      return res.status(400).json({
+        message: "Auction already ended",
+      });
     }
 
     const amount = Number(bidAmount);
@@ -224,6 +252,7 @@ app.post("/api/place-bid/:id", async (req, res) => {
     }
 
     auction.currentBid = amount;
+
     auction.bids.push({
       bidderName: bidderName || "Anonymous",
       bidAmount: amount,
@@ -232,26 +261,36 @@ app.post("/api/place-bid/:id", async (req, res) => {
 
     await auction.save();
 
-    res.json({ message: "Bid placed!", auction });
+    res.json({
+      message: "Bid placed",
+      auction,
+    });
   } catch (err) {
     console.error("Bid error:", err);
-    res.status(500).json({ message: "Failed to place bid." });
+    res.status(500).json({
+      message: "Failed to place bid",
+    });
   }
 });
 
-// RESET auctions
+/* RESET AUCTIONS */
 app.delete("/api/auctions/reset", async (req, res) => {
   try {
     await Auction.deleteMany({});
-    res.json({ message: "All auctions cleared." });
+    res.json({
+      message: "All auctions cleared",
+    });
   } catch (err) {
-    res.status(500).json({ message: "Failed to reset auctions." });
+    res.status(500).json({
+      message: "Failed to reset auctions",
+    });
   }
 });
 
 /* ==============================
    START SERVER
 ============================== */
+
 app.listen(PORT, () => {
-  console.log(`🚀 BiliBid server running at http://localhost:${PORT}`);
+  console.log(`🚀 BiliBid server running on port ${PORT}`);
 });

@@ -336,12 +336,19 @@ async function handleSignup() {
   }
 }
 
-document.getElementById("authModal").addEventListener("click", function (e) {
-  if (e.target === this) closeAuth();
-});
-document.getElementById("bidModal").addEventListener("click", function (e) {
-  if (e.target === this) closeBid();
-});
+const authModal = document.getElementById("authModal");
+if (authModal) {
+  authModal.addEventListener("click", function (e) {
+    if (e.target === this) closeAuth();
+  });
+}
+
+const bidModal = document.getElementById("bidModal");
+if (bidModal) {
+  bidModal.addEventListener("click", function (e) {
+    if (e.target === this) closeBid();
+  });
+}
 
 // ============================================================
 // NAV INJECTION — search bar + auth buttons
@@ -420,7 +427,9 @@ document.addEventListener("click", (e) => {
 });
 
 document.querySelectorAll(".cat-card").forEach((card) => {
-  const catName = card.querySelector(".cat-name").textContent;
+  const nameEl = card.querySelector(".cat-name");
+  if (!nameEl) return;
+  const catName = nameEl.textContent;
   card.addEventListener("click", () => filterByCategory(catName));
 });
 
@@ -666,7 +675,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   } catch (e) {
     console.error("Server connection failed:", e);
     document.getElementById("auctionGrid").innerHTML =
-      '<div style="color:#ff4757;padding:40px;text-align:center;grid-column:1/-1;">Could not connect to server. Make sure <code>node server.js</code> is running on port 3000.</div>';
+      '<div style="color:#ff4757;padding:40px;text-align:center;grid-column:1/-1;">Could not connect to server.</div>';
     showToast("Server offline - start node server.js", "red");
   }
 });
