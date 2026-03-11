@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>BiliBid — Dashboard</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
@@ -168,6 +168,7 @@
         cursor: pointer;
         border: 2px solid var(--gold);
         position: relative;
+        color: #fff;
       }
       .avatar-btn::after {
         content: "";
@@ -251,6 +252,7 @@
         font-family: "Syne", sans-serif;
         border: 3px solid var(--gold);
         position: relative;
+        color: #fff;
       }
       .profile-avatar::after {
         content: "";
@@ -497,6 +499,7 @@
         font-size: 16px;
         flex-shrink: 0;
         border: 2px solid var(--gold);
+        color: #fff;
       }
       .composer-input {
         flex: 1;
@@ -598,6 +601,7 @@
         flex-shrink: 0;
         cursor: pointer;
         border: 2px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
       }
       .post-meta {
         flex: 1;
@@ -898,27 +902,6 @@
       .post-action.watching {
         color: var(--gold);
       }
-      .bh-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 5px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .bh-item:last-child {
-        border-bottom: none;
-      }
-      .bh-av {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        flex-shrink: 0;
-      }
       .comments-section {
         border-top: 1px solid var(--border);
         padding: 14px;
@@ -981,6 +964,7 @@
         font-size: 12px;
         font-weight: 700;
         flex-shrink: 0;
+        color: #fff;
       }
       .comment-bubble {
         background: var(--surface2);
@@ -1161,6 +1145,7 @@
         font-size: 14px;
         flex-shrink: 0;
         position: relative;
+        color: #fff;
       }
       .online-avatar::after {
         content: "";
@@ -1192,6 +1177,7 @@
       .online-status.on {
         color: var(--green);
       }
+      /* CHAT POPUP — fixed height, internal scroll */
       .chat-popup {
         position: fixed;
         bottom: 20px;
@@ -1205,6 +1191,8 @@
         overflow: hidden;
         display: none;
         flex-direction: column;
+        height: 420px;
+        max-height: 80vh;
       }
       .chat-popup.open {
         display: flex;
@@ -1216,6 +1204,7 @@
         align-items: center;
         gap: 10px;
         border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
       }
       .chat-h-av {
         width: 36px;
@@ -1228,6 +1217,7 @@
         font-size: 14px;
         position: relative;
         flex-shrink: 0;
+        color: #fff;
       }
       .chat-h-av::after {
         content: "";
@@ -1268,11 +1258,11 @@
       .chat-messages {
         flex: 1;
         padding: 14px;
-        height: 280px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 10px;
+        min-height: 0;
       }
       .chat-messages::-webkit-scrollbar {
         width: 4px;
@@ -1314,6 +1304,7 @@
         align-items: center;
         border-top: 1px solid var(--border);
         background: var(--surface2);
+        flex-shrink: 0;
       }
       .chat-input {
         flex: 1;
@@ -1371,6 +1362,7 @@
         transition: all 0.2s;
         position: relative;
         border: 3px solid var(--bg);
+        color: #fff;
       }
       .chat-bubble:hover {
         transform: scale(1.1);
@@ -1722,6 +1714,7 @@
         display: flex;
         gap: 14px;
         align-items: center;
+        transition: all 0.2s;
       }
       .watchlist-item:hover {
         border-color: var(--gold);
@@ -1854,6 +1847,48 @@
         border-color: var(--gold);
         color: var(--gold);
       }
+      /* Follow button */
+      .follow-btn {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 9px 22px;
+        border-radius: 50px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .follow-btn:hover {
+        transform: translateY(-1px);
+        opacity: 0.9;
+      }
+      /* Stat blocks for profile */
+      .profile-stat-block {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex: 1;
+      }
+      .profile-stat-block:hover {
+        border-color: var(--blue-light);
+      }
+      .profile-stat-num {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--gold);
+      }
+      .profile-stat-label {
+        font-size: 12px;
+        color: var(--muted2);
+        margin-top: 3px;
+      }
     </style>
   </head>
   <body>
@@ -1891,7 +1926,9 @@
         <div class="icon-btn" onclick="navigate('watchlist')" title="Watchlist">
           🏷️
         </div>
-        <button class="btn-post" onclick="openModal()">＋ Post Auction</button>
+        <button class="btn-post" onclick="checkVerifiedAndPost()">
+          ＋ Post Auction
+        </button>
         <div
           class="avatar-btn"
           onclick="navigate('profile')"
@@ -1907,7 +1944,9 @@
         <div class="profile-card" onclick="navigate('profile')">
           <div class="profile-avatar">JN</div>
           <div class="profile-name">Jarme Nathaniel</div>
-          <div class="profile-handle">@jarmenathaniel · ⭐ 4.9</div>
+          <div class="profile-handle" id="sidebarHandle">
+            @jarmenathaniel · ⭐ 4.9
+          </div>
           <div class="profile-stats">
             <div
               class="stat"
@@ -1991,7 +2030,7 @@
           <span class="cat-dot" style="background: #3b82f6"></span>Electronics
         </div>
         <div class="category-item" onclick="filterCat('Fashion')">
-          <span class="cat-dot" style="background: #f59e0b"></span>Fashion &
+          <span class="cat-dot" style="background: #f59e0b"></span>Fashion &amp;
           Bags
         </div>
         <div class="category-item" onclick="filterCat('Sneakers')">
@@ -2052,7 +2091,7 @@
         <div class="page active" id="page-feed">
           <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
             <div class="stories-bar">
-              <div class="story-item" onclick="openModal()">
+              <div class="story-item" onclick="checkVerifiedAndPost()">
                 <div
                   class="story-ring"
                   style="background: var(--surface3); padding: 2px"
@@ -2107,21 +2146,21 @@
             <div class="composer">
               <div class="composer-top">
                 <div class="composer-avatar">JN</div>
-                <div class="composer-input" onclick="openModal()">
+                <div class="composer-input" onclick="checkVerifiedAndPost()">
                   What are you selling today, Jarme?
                 </div>
               </div>
               <div class="composer-actions">
-                <div class="composer-btn" onclick="openModal()">
+                <div class="composer-btn" onclick="checkVerifiedAndPost()">
                   📸 Add Photo
                 </div>
-                <div class="composer-btn" onclick="openModal()">
+                <div class="composer-btn" onclick="checkVerifiedAndPost()">
                   🏷️ Set Price
                 </div>
-                <div class="composer-btn" onclick="openModal()">
+                <div class="composer-btn" onclick="checkVerifiedAndPost()">
                   ⏱️ Duration
                 </div>
-                <div class="composer-btn" onclick="openModal()">
+                <div class="composer-btn" onclick="checkVerifiedAndPost()">
                   🎮 Category
                 </div>
               </div>
@@ -2165,7 +2204,7 @@
                 margin-bottom: 16px;
               "
             >
-              <button class="btn-submit" onclick="openModal()">
+              <button class="btn-submit" onclick="checkVerifiedAndPost()">
                 ＋ Post New Auction
               </button>
             </div>
@@ -2269,7 +2308,11 @@
         <div class="page" id="page-profile">
           <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
             <div class="page-header">👤 Profile</div>
-            <div class="page-sub">Manage your account information</div>
+            <div class="page-sub">
+              Manage your account &amp; identity verification
+            </div>
+
+            <!-- Profile card with followers/following -->
             <div class="card" style="text-align: center">
               <div
                 style="
@@ -2285,6 +2328,7 @@
                   font-family: &quot;Syne&quot;, sans-serif;
                   border: 3px solid var(--gold);
                   margin: 0 auto 16px;
+                  color: #fff;
                 "
               >
                 JN
@@ -2300,14 +2344,11 @@
                 Jarme Nathaniel
               </div>
               <div
-                style="
-                  color: var(--muted2);
-                  font-size: 13px;
-                  margin: 4px 0 10px;
-                "
+                style="color: var(--muted2); font-size: 13px; margin: 4px 0 8px"
               >
                 @jarmenathaniel
               </div>
+              <div id="verifiedBadge" style="margin-bottom: 14px"></div>
               <div
                 style="
                   display: inline-flex;
@@ -2320,11 +2361,59 @@
                   font-size: 12px;
                   color: var(--gold);
                   font-weight: 600;
+                  margin-bottom: 18px;
                 "
               >
                 ⭐ 4.9 Seller Rating · 152 Reviews
               </div>
+              <!-- Followers / Following / Follow button -->
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  justify-content: center;
+                  margin-bottom: 16px;
+                "
+              >
+                <div
+                  class="profile-stat-block"
+                  onclick="toast('👥 Followers list', 'info')"
+                >
+                  <div class="profile-stat-num" id="followerCount">48</div>
+                  <div class="profile-stat-label">Followers</div>
+                </div>
+                <div
+                  class="profile-stat-block"
+                  onclick="toast('👥 Following list', 'info')"
+                >
+                  <div class="profile-stat-num" id="followingCount">31</div>
+                  <div class="profile-stat-label">Following</div>
+                </div>
+                <div
+                  class="profile-stat-block"
+                  onclick="navigate('my-auctions')"
+                >
+                  <div class="profile-stat-num">24</div>
+                  <div class="profile-stat-label">Listings</div>
+                </div>
+              </div>
+              <button
+                class="follow-btn"
+                id="followSelfBtn"
+                data-following="false"
+                onclick="toggleFollow(this)"
+              >
+                + Follow
+              </button>
             </div>
+
+            <!-- ID Verification -->
+            <div class="card">
+              <div class="card-title">🪪 ID Verification</div>
+              <div id="verificationSection"><!-- rendered by JS --></div>
+            </div>
+
+            <!-- Edit Profile -->
             <div class="card">
               <div class="card-title">✏️ Edit Profile</div>
               <div class="form-group">
@@ -2373,6 +2462,14 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 💾 Save Changes
               </button>
             </div>
+
+            <!-- Buyer Reviews -->
+            <div class="card">
+              <div class="card-title">⭐ Buyer Reviews</div>
+              <div id="reviewsContent"><!-- rendered by JS --></div>
+            </div>
+
+            <!-- Security -->
             <div class="card">
               <div class="card-title">🔒 Security</div>
               <div class="form-group">
@@ -2550,7 +2647,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
               🏷️ LuxuryMNL
             </div>
             <div style="font-size: 12px; color: var(--muted2)">
-              Designer bags, watches & jewelry. 98% positive feedback.
+              Designer bags, watches &amp; jewelry. 98% positive feedback.
             </div>
             <button
               class="bid-btn"
@@ -2664,7 +2761,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
               ><select class="form-select" id="pCat">
                 <option>Electronics</option>
                 <option>Sneakers</option>
-                <option>Fashion & Bags</option>
+                <option>Fashion &amp; Bags</option>
                 <option>Gaming</option>
                 <option>Cameras</option>
                 <option>Watches</option>
@@ -2738,7 +2835,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
       id="walletModal"
       onclick="if (event.target === this) closeWM();"
     >
-      <div class="modal" style="max-width: 400px">
+      <div class="modal" style="max-width: 440px">
         <div class="modal-title" id="wmTitle">Add Funds</div>
         <div class="modal-sub" id="wmSub">Add money to your BiliBid wallet</div>
         <div class="form-group">
@@ -2750,17 +2847,10 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
             placeholder="Enter amount"
           />
         </div>
+        <!-- Dynamic payment method select -->
+        <div id="wmMethodWrap"></div>
+        <!-- Dynamic extra fields based on method -->
         <div id="wmExtra"></div>
-        <div class="form-group">
-          <label class="form-label">Payment Method</label
-          ><select class="form-select" id="wmMethod">
-            <option>GCash</option>
-            <option>Maya</option>
-            <option>BDO Bank Transfer</option>
-            <option>BPI Bank Transfer</option>
-            <option>UnionBank</option>
-          </select>
-        </div>
         <div class="modal-footer">
           <button class="btn-cancel" onclick="closeWM()">Cancel</button>
           <button class="btn-submit" id="wmBtn" onclick="processWallet()">
@@ -2788,1261 +2878,6 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
     </div>
 
     <div class="toast" id="toast"></div>
-
-    <script>
-      // ===== STATE =====
-      let walletBal = 12500;
-      let confirmCb = null;
-      let walletType = "";
-      let feedFilter = "all";
-      let likedPosts = {},
-        watchedPosts = {},
-        postComments = {};
-      let notifs = [
-        {
-          id: 1,
-          read: false,
-          icon: "⚡",
-          text: "<strong>KarlSneakers</strong> outbid you on Jordan 1 Retro! Current: <strong>₱4,200</strong>",
-          time: "2 min ago",
-        },
-        {
-          id: 2,
-          read: false,
-          icon: "⏰",
-          text: "<strong>Your auction</strong> for PS5 Controller ends in <strong>1 hour!</strong>",
-          time: "1 hour ago",
-        },
-        {
-          id: 3,
-          read: false,
-          icon: "🎉",
-          text: "<strong>Ana N.</strong> won your MacBook Pro for <strong>₱72,000</strong> 🎉",
-          time: "Yesterday",
-        },
-        {
-          id: 4,
-          read: true,
-          icon: "💬",
-          text: "<strong>MariaSells</strong> sent you a message about the iPhone",
-          time: "2 hours ago",
-        },
-        {
-          id: 5,
-          read: true,
-          icon: "👍",
-          text: "<strong>TechHub PH</strong> liked your MacBook Air listing",
-          time: "3 hours ago",
-        },
-        {
-          id: 6,
-          read: true,
-          icon: "🏷️",
-          text: "PS5 Controller has received <strong>12 new bids</strong>",
-          time: "Today",
-        },
-      ];
-      let notifCount = 3;
-
-      const txList = [
-        {
-          icon: "🎉",
-          name: "Sold: MacBook Pro 2022",
-          date: "Feb 27",
-          amt: 72000,
-          type: "credit",
-        },
-        {
-          icon: "🏆",
-          name: "Won: Sony WH-1000XM5",
-          date: "Feb 25",
-          amt: -8500,
-          type: "debit",
-        },
-        {
-          icon: "💳",
-          name: "Added Funds via GCash",
-          date: "Feb 24",
-          amt: 5000,
-          type: "credit",
-        },
-        {
-          icon: "🎉",
-          name: "Sold: Canon EOS R50",
-          date: "Feb 20",
-          amt: 35000,
-          type: "credit",
-        },
-        {
-          icon: "↓",
-          name: "Withdrawal to BDO",
-          date: "Feb 18",
-          amt: -20000,
-          type: "debit",
-        },
-      ];
-
-      const chatData = {
-        MariaSells: {
-          init: "MS",
-          bg: "linear-gradient(135deg,#f59e0b,#ea580c)",
-          stat: "Active now",
-          msgs: [
-            {
-              t: "them",
-              tx: "Hi! Is the iPhone still available? 😊",
-              time: "2:34 PM",
-            },
-            {
-              t: "me",
-              tx: "Yes! Auction ends in 2 hours. Bid or Buy Now 🔥",
-              time: "2:36 PM",
-            },
-            {
-              t: "them",
-              tx: "What's the lowest for Buy Now?",
-              time: "2:37 PM",
-            },
-            { t: "me", tx: "Best I can do is ₱31,000!", time: "2:38 PM" },
-          ],
-        },
-        "TechHub PH": {
-          init: "TH",
-          bg: "linear-gradient(135deg,#7c3aed,#2563eb)",
-          stat: "Active now",
-          msgs: [
-            {
-              t: "them",
-              tx: "Are you interested in the MacBook? Let's deal!",
-              time: "1:10 PM",
-            },
-            {
-              t: "me",
-              tx: "What's the lowest bid you'll accept?",
-              time: "1:15 PM",
-            },
-          ],
-        },
-        "Karl Sneakers": {
-          init: "KS",
-          bg: "linear-gradient(135deg,#10b981,#0891b2)",
-          stat: "In auction",
-          msgs: [
-            { t: "them", tx: "Size 10 available pa ba?", time: "11:00 AM" },
-          ],
-        },
-        "Juan Dela Cruz": {
-          init: "JD",
-          bg: "linear-gradient(135deg,#4b5563,#374151)",
-          stat: "Active 3h ago",
-          msgs: [],
-        },
-        "Ana Navarro": {
-          init: "AN",
-          bg: "linear-gradient(135deg,#ec4899,#8b5cf6)",
-          stat: "Active yesterday",
-          msgs: [],
-        },
-      };
-      let currentChat = "MariaSells";
-
-      const myListings = {
-        active: [
-          {
-            e: "🎮",
-            n: "PS5 DualSense Controller",
-            p: "₱2,800",
-            b: 12,
-            t: "1d 2h",
-            c: "Brand New",
-          },
-          {
-            e: "📷",
-            n: "Sony Camera Lens 50mm f/1.8",
-            p: "₱5,500",
-            b: 8,
-            t: "3h 12m",
-            c: "Like New",
-          },
-          {
-            e: "📱",
-            n: "Samsung Galaxy S24 Ultra",
-            p: "₱45,000",
-            b: 3,
-            t: "6h 44m",
-            c: "Brand New",
-          },
-        ],
-        ended: [
-          {
-            e: "💻",
-            n: "Dell XPS 15 Laptop",
-            p: "₱55,000",
-            b: 0,
-            t: "Ended",
-            c: "Pre-loved",
-          },
-          {
-            e: "🎧",
-            n: "Sony WH-1000XM4",
-            p: "₱8,000",
-            b: 1,
-            t: "Ended",
-            c: "Like New",
-          },
-        ],
-        sold: [
-          {
-            e: "⌚",
-            n: "Casio G-Shock DW5600",
-            p: "₱3,100",
-            b: 7,
-            t: "Sold",
-            c: "Pre-loved",
-          },
-          {
-            e: "🖥️",
-            n: "MacBook Pro 2022",
-            p: "₱72,000",
-            b: 15,
-            t: "Sold",
-            c: "Like New",
-          },
-          {
-            e: "📸",
-            n: "Canon EOS R50",
-            p: "₱35,000",
-            b: 9,
-            t: "Sold",
-            c: "Brand New",
-          },
-        ],
-      };
-
-      let watchItems = [
-        {
-          e: "📱",
-          n: "iPhone 15 Pro Max 256GB",
-          p: "₱28,500",
-          seller: "Maria Reyes",
-          time: "2h 9m",
-          bids: 47,
-        },
-        {
-          e: "👟",
-          n: "Nike Air Jordan 1 Retro",
-          p: "₱4,200",
-          seller: "Karl Sneakers",
-          time: "40m",
-          bids: 23,
-        },
-        {
-          e: "💻",
-          n: "MacBook Air M2",
-          p: "₱62,000",
-          seller: "TechHub PH",
-          time: "18h",
-          bids: 31,
-        },
-        {
-          e: "🎮",
-          n: "Nintendo Switch OLED",
-          p: "₱12,500",
-          seller: "GamersHub",
-          time: "1d 5h",
-          bids: 18,
-        },
-        {
-          e: "⌚",
-          n: "Apple Watch Series 9",
-          p: "₱18,000",
-          seller: "GadgetPH",
-          time: "6h",
-          bids: 9,
-        },
-      ];
-
-      let wonItems = [
-        {
-          e: "🎧",
-          n: "Sony WH-1000XM5",
-          p: "₱8,500",
-          date: "Feb 25",
-          seller: "AudioPH",
-          s: "Delivered",
-        },
-        {
-          e: "⌚",
-          n: "Vintage Rolex Submariner",
-          p: "₱15,000",
-          date: "Feb 15",
-          seller: "LuxuryMNL",
-          s: "Processing",
-        },
-        {
-          e: "👟",
-          n: "Yeezy Boost 350 V2",
-          p: "₱6,200",
-          date: "Feb 10",
-          seller: "SneakersPH",
-          s: "Delivered",
-        },
-        {
-          e: "📷",
-          n: "Fujifilm X-T5 Camera",
-          p: "₱52,000",
-          date: "Feb 3",
-          seller: "GadgetPH",
-          s: "Delivered",
-        },
-      ];
-
-      const posts = [
-        {
-          id: "p1",
-          av: "MR",
-          avbg: "linear-gradient(135deg,#7c3aed,#2563eb)",
-          author: "Maria Reyes",
-          verified: true,
-          badge: "⭐ Top Seller",
-          time: "2 hours ago",
-          cat: "Electronics",
-          e: "📱",
-          title: "iPhone 15 Pro Max 256GB — Deep Titanium",
-          desc: "Brand new, sealed in box. Apple PH warranty. Bought as a gift but already have one. Complete with original receipt.",
-          tags: [
-            "📱 iPhone",
-            "✨ Brand New",
-            "📦 Free Shipping",
-            "🇵🇭 Metro Manila",
-          ],
-          bid: 28500,
-          bids: 47,
-          startBid: 20000,
-          buyNow: 32000,
-          secs: 7800,
-          prog: 78,
-          live: true,
-          likes: 84,
-          filter: "Electronics",
-        },
-        {
-          id: "p2",
-          av: "TH",
-          avbg: "linear-gradient(135deg,#f59e0b,#ea580c)",
-          author: "TechHub PH",
-          verified: true,
-          badge: null,
-          time: "5 hours ago",
-          cat: "Computers",
-          e: "💻",
-          title: "MacBook Air M2 — Midnight, 8GB/256GB",
-          desc: "Unit only, complete accessories, international warranty. 2 months old, mint condition. Upgrading to Pro.",
-          tags: ["💻 MacBook", "🍎 Apple M2", "✅ Verified Seller"],
-          bid: 62000,
-          bids: 31,
-          startBid: 50000,
-          buyNow: 70000,
-          secs: 67440,
-          prog: 45,
-          live: false,
-          likes: 112,
-          filter: "Electronics",
-        },
-        {
-          id: "p3",
-          av: "KS",
-          avbg: "linear-gradient(135deg,#10b981,#0891b2)",
-          author: "Karl Sneakers PH",
-          verified: false,
-          badge: null,
-          time: "1 day ago",
-          cat: "Sneakers",
-          e: "👟",
-          title: 'Nike Air Jordan 1 Retro High OG "Chicago"',
-          desc: "Pre-loved, worn once. US10 / EU44. 100% authentic with receipt. Original box included. No box damage.",
-          tags: ["👟 Jordan 1", "🔥 Rare", "📦 With Box", "💯 Legit Check"],
-          bid: 4200,
-          bids: 23,
-          startBid: 2000,
-          buyNow: null,
-          secs: 2402,
-          prog: 92,
-          live: true,
-          likes: 67,
-          filter: "Sneakers",
-        },
-        {
-          id: "p4",
-          av: "GH",
-          avbg: "linear-gradient(135deg,#8b5cf6,#ec4899)",
-          author: "GamersHub PH",
-          verified: true,
-          badge: null,
-          time: "3 hours ago",
-          cat: "Gaming",
-          e: "🎮",
-          title: "Nintendo Switch OLED — White Edition",
-          desc: "Barely used, comes with carrying case and original box. Great condition, no scratches on screen.",
-          tags: ["🎮 Nintendo", "OLED", "📦 With Box", "✨ Like New"],
-          bid: 10000,
-          bids: 18,
-          startBid: 8000,
-          buyNow: 15000,
-          secs: 3900,
-          prog: 60,
-          live: false,
-          likes: 43,
-          filter: "Gaming",
-        },
-      ];
-      let timers = {};
-      posts.forEach((p) => {
-        timers[p.id] = p.secs;
-        postComments[p.id] = [
-          {
-            av: "JD",
-            bg: "linear-gradient(135deg,#4b5563,#374151)",
-            author: "Juan D.",
-            text: "Is this still available?",
-            time: "1h ago",
-          },
-          {
-            av: "AN",
-            bg: "linear-gradient(135deg,#ec4899,#8b5cf6)",
-            author: "Ana N.",
-            text: "What's the lowest?",
-            time: "30m ago",
-          },
-        ];
-      });
-
-      // ===== TIMERS =====
-      function pad(n) {
-        return String(n).padStart(2, "0");
-      }
-      setInterval(() => {
-        posts.forEach((p) => {
-          if (timers[p.id] > 0) timers[p.id]--;
-          const el = document.getElementById("tmr-" + p.id);
-          if (!el) return;
-          const t = timers[p.id],
-            h = Math.floor(t / 3600),
-            m = Math.floor((t % 3600) / 60),
-            s = t % 60;
-          el.innerHTML = `<div class="time-unit"><div class="time-num">${pad(h)}</div><div class="time-label">hrs</div></div><div class="time-unit"><div class="time-num">${pad(m)}</div><div class="time-label">min</div></div><div class="time-unit"><div class="time-num">${pad(s)}</div><div class="time-label">sec</div></div>`;
-        });
-      }, 1000);
-
-      // ===== NAVIGATE =====
-      function navigate(page) {
-        document
-          .querySelectorAll(".page")
-          .forEach((p) => p.classList.remove("active"));
-        document
-          .querySelectorAll(".nav-item")
-          .forEach((n) => n.classList.remove("active"));
-        const pg = document.getElementById("page-" + page);
-        if (pg) pg.classList.add("active");
-        const nv = document.getElementById("nav-" + page);
-        if (nv) nv.classList.add("active");
-        if (page === "feed") renderFeed();
-        if (page === "my-auctions") renderMyAuct("active");
-        if (page === "watchlist") renderWatchlist();
-        if (page === "won") renderWon();
-        if (page === "notifications") renderNotifs();
-        if (page === "wallet") renderWallet();
-        window.scrollTo(0, 0);
-      }
-
-      // ===== FEED =====
-      function renderFeed() {
-        let fp = [...posts];
-        if (feedFilter === "ending")
-          fp.sort((a, b) => timers[a.id] - timers[b.id]);
-        else if (feedFilter !== "all" && feedFilter !== "following")
-          fp = posts.filter((p) => p.filter === feedFilter);
-        document.getElementById("postsContainer").innerHTML = fp
-          .map(buildPost)
-          .join("");
-      }
-
-      function buildPost(p) {
-        const bid = p.bid,
-          bids = p.bids,
-          liked = likedPosts[p.id],
-          watched = watchedPosts[p.id];
-        const ending = timers[p.id] < 3600;
-        const cs = postComments[p.id] || [];
-        return `<div class="auction-post" id="${p.id}">
-  <div class="post-header">
-    <div class="post-avatar" style="background:${p.avbg}" onclick="openChatByName('${p.author}')">${p.av}</div>
-    <div class="post-meta">
-      <div class="post-author">${p.author} ${p.verified ? '<span class="verified">✓</span>' : ""} ${p.badge ? `<span class="seller-badge">${p.badge}</span>` : ""}</div>
-      <div class="post-time">${p.time} · ${p.cat}</div>
-    </div>
-    <div class="post-menu-wrap">
-      <div class="post-menu" onclick="toggleMenu('${p.id}')">···</div>
-      <div class="post-menu-dropdown" id="menu-${p.id}">
-        <div class="menu-opt" onclick="closeMenus();openChatByName('${p.author}')">💬 Message Seller</div>
-        <div class="menu-opt" onclick="closeMenus();doWatch('${p.id}')">👁️ ${watched ? "Unwatch" : "Watch Item"}</div>
-        <div class="menu-opt" onclick="closeMenus();doShare()">🔗 Share Listing</div>
-        <div class="menu-opt danger" onclick="closeMenus();toast('✅ Reported','info')">🚩 Report</div>
-      </div>
-    </div>
-  </div>
-  <div class="post-product-img" onclick="doWatch('${p.id}')">${p.e}${p.live ? '<div class="img-overlay"><div class="live-dot"></div> LIVE AUCTION</div>' : ""}</div>
-  <div class="post-body">
-    <div class="post-title">${p.title}</div>
-    <div class="post-desc">${p.desc}</div>
-    <div class="post-tags">${p.tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-    <div class="bid-section">
-      <div class="bid-row">
-        <div>
-          <div class="bid-label">Current Bid</div>
-          <div class="bid-amount" id="ba-${p.id}">₱${bid.toLocaleString()}</div>
-          <div class="bid-count" id="bc-${p.id}">${bids} bids · ${watched ? "👁️ Watching" : "Not watching"}</div>
-        </div>
-        <div>
-          <div class="bid-label">Time Left</div>
-          <div class="timer" id="tmr-${p.id}">
-            <div class="time-unit"><div class="time-num">${pad(Math.floor(p.secs / 3600))}</div><div class="time-label">hrs</div></div>
-            <div class="time-unit"><div class="time-num">${pad(Math.floor((p.secs % 3600) / 60))}</div><div class="time-label">min</div></div>
-            <div class="time-unit"><div class="time-num">${pad(p.secs % 60)}</div><div class="time-label">sec</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="bid-progress"><div class="bid-progress-fill" style="width:${p.prog}%;${ending ? "background:linear-gradient(90deg,var(--red),var(--gold))" : ""}"></div></div>
-      <div style="font-size:11px;color:${ending ? "var(--red)" : "var(--muted2)"};margin-top:6px;font-weight:${ending ? 700 : 400}">
-        ${ending ? "⚠️ Ending very soon!" : "Starting: ₱" + p.startBid.toLocaleString() + (p.buyNow ? " · Buy Now: ₱" + p.buyNow.toLocaleString() : "")}
-      </div>
-    </div>
-    <div class="bid-input-row" style="margin-top:14px">
-      <input class="bid-input" type="number" id="bi-${p.id}" placeholder="Min ₱${(bid + 100).toLocaleString()}">
-      <button class="bid-btn${ending ? " gold-btn" : ""}" onclick="placeBid('${p.id}')">🔥 ${ending ? "⚡ NOW!" : "Place Bid"}</button>
-    </div>
-    ${p.buyNow ? `<button class="bid-btn gold-btn" style="width:100%;padding:12px" onclick="buyNow('${p.id}',${p.buyNow})">⚡ Buy Now — ₱${p.buyNow.toLocaleString()}</button>` : ""}
-  </div>
-  <div class="post-actions">
-    <button class="post-action${liked ? " liked" : ""}" id="like-${p.id}" onclick="doLike('${p.id}')">❤️ <span id="lc-${p.id}">${p.likes + (liked ? 1 : 0)}</span></button>
-    <button class="post-action" onclick="toggleComments('${p.id}')">💬 <span id="cc-${p.id}">${cs.length}</span> Comments</button>
-    <button class="post-action${watched ? " watching" : ""}" id="wbtn-${p.id}" onclick="doWatch('${p.id}')">👁️ ${watched ? "Watching" : "Watch"}</button>
-    <button class="post-action" onclick="doShare()">↗️ Share</button>
-  </div>
-  <div class="comments-section" id="cmts-${p.id}">
-    <div class="comment-input-row">
-      <div class="composer-avatar" style="width:32px;height:32px;font-size:11px;flex-shrink:0">JN</div>
-      <input class="comment-input" id="cin-${p.id}" placeholder="Write a comment..." onkeydown="if(event.key==='Enter')addComment('${p.id}')">
-      <button class="comment-send" onclick="addComment('${p.id}')">➤</button>
-    </div>
-    <div id="clist-${p.id}">${cs.map((c) => `<div class="comment-item"><div class="comment-av" style="background:${c.bg}">${c.av}</div><div class="comment-bubble"><div class="comment-author">${c.author}</div><div class="comment-text">${c.text}</div><div class="comment-actions"><button class="comment-action" onclick="toast('👍 Liked!','info')">👍 Like</button><button class="comment-action" onclick="toast('💬 Reply...','info')">💬 Reply</button><span style="font-size:11px;color:var(--muted)">${c.time}</span></div></div></div>`).join("")}</div>
-  </div>
-  </div>`;
-      }
-
-      function setFilter(el, f) {
-        document
-          .querySelectorAll(".filter-tab")
-          .forEach((t) => t.classList.remove("active"));
-        el.classList.add("active");
-        feedFilter = f;
-        renderFeed();
-      }
-      function filterCat(cat) {
-        navigate("feed");
-        feedFilter = cat;
-        document
-          .querySelectorAll(".filter-tab")
-          .forEach((t) => t.classList.remove("active"));
-        renderFeed();
-        toast("🔍 " + cat, "info");
-      }
-
-      // ===== BID ACTIONS =====
-      function placeBid(pid) {
-        const el = document.getElementById("bi-" + pid),
-          val = parseInt(el?.value);
-        const post = posts.find((p) => p.id === pid);
-        if (!val || isNaN(val)) {
-          toast("⚠️ Enter a bid amount first!", "error");
-          return;
-        }
-        if (val <= post.bid) {
-          toast(
-            "⚠️ Bid must be higher than ₱" + post.bid.toLocaleString(),
-            "error",
-          );
-          return;
-        }
-        if (walletBal < val) {
-          toast("⚠️ Insufficient wallet balance!", "error");
-          navigate("wallet");
-          return;
-        }
-        showConfirm(
-          "🔥",
-          "Place Bid",
-          `Bid <strong>₱${val.toLocaleString()}</strong> on this item?`,
-          "Place Bid",
-          false,
-          () => {
-            post.bid = val;
-            post.bids++;
-            document.getElementById("ba-" + pid).textContent =
-              "₱" + val.toLocaleString();
-            document.getElementById("bc-" + pid).textContent =
-              post.bids +
-              " bids · " +
-              (watchedPosts[pid] ? "👁️ Watching" : "Not watching");
-            el.value = "";
-            el.placeholder = "Min ₱" + (val + 100).toLocaleString();
-            toast("🔥 Bid of ₱" + val.toLocaleString() + " placed!", "success");
-            addNotif(
-              "🔥",
-              "You placed a bid of ₱" + val.toLocaleString() + "!",
-            );
-          },
-        );
-      }
-
-      function buyNow(pid, price) {
-        if (walletBal < price) {
-          toast("⚠️ Insufficient balance!", "error");
-          navigate("wallet");
-          return;
-        }
-        showConfirm(
-          "⚡",
-          "Buy Now",
-          `Buy for <strong>₱${price.toLocaleString()}</strong>? Deducted from wallet.`,
-          "Buy Now!",
-          false,
-          () => {
-            walletBal -= price;
-            txList.unshift({
-              icon: "🏆",
-              name: "Won via Buy Now",
-              date: "Just now",
-              amt: -price,
-              type: "debit",
-            });
-            wonItems.unshift({
-              e: "🛒",
-              n: "New Purchase",
-              p: "₱" + price.toLocaleString(),
-              date: "Today",
-              seller: "Seller",
-              s: "Processing",
-            });
-            toast(
-              "🎉 Purchased for ₱" + price.toLocaleString() + "!",
-              "success",
-            );
-            addNotif(
-              "🎉",
-              "You bought an item for ₱" + price.toLocaleString() + "!",
-            );
-          },
-        );
-      }
-
-      // ===== LIKE / WATCH / SHARE =====
-      function doLike(pid) {
-        likedPosts[pid] = !likedPosts[pid];
-        const post = posts.find((p) => p.id === pid);
-        document.getElementById("lc-" + pid).textContent =
-          post.likes + (likedPosts[pid] ? 1 : 0);
-        const btn = document.getElementById("like-" + pid);
-        btn.className = "post-action" + (likedPosts[pid] ? " liked" : "");
-        toast(likedPosts[pid] ? "❤️ Liked!" : "💔 Unliked", "info");
-      }
-
-      function doWatch(pid) {
-        watchedPosts[pid] = !watchedPosts[pid];
-        const btn = document.getElementById("wbtn-" + pid);
-        if (btn) {
-          btn.className =
-            "post-action" + (watchedPosts[pid] ? " watching" : "");
-          btn.textContent = "👁️ " + (watchedPosts[pid] ? "Watching" : "Watch");
-        }
-        const bc = document.getElementById("bc-" + pid);
-        const post = posts.find((p) => p.id === pid);
-        if (bc && post)
-          bc.textContent =
-            post.bids +
-            " bids · " +
-            (watchedPosts[pid] ? "👁️ Watching" : "Not watching");
-        toast(
-          watchedPosts[pid]
-            ? "👁️ Added to Watchlist!"
-            : "Removed from Watchlist",
-          "info",
-        );
-      }
-
-      function doShare() {
-        try {
-          navigator.clipboard?.writeText(window.location.href);
-        } catch (e) {}
-        toast("🔗 Link copied!", "success");
-      }
-
-      // ===== COMMENTS =====
-      function toggleComments(pid) {
-        const el = document.getElementById("cmts-" + pid);
-        el.classList.toggle("open");
-        if (el.classList.contains("open"))
-          document.getElementById("cin-" + pid)?.focus();
-      }
-
-      function addComment(pid) {
-        const input = document.getElementById("cin-" + pid),
-          text = input?.value.trim();
-        if (!text) return;
-        if (!postComments[pid]) postComments[pid] = [];
-        postComments[pid].push({
-          av: "JN",
-          bg: "linear-gradient(135deg,var(--blue),var(--gold))",
-          author: "Jarme N.",
-          text,
-          time: "Just now",
-        });
-        const list = document.getElementById("clist-" + pid);
-        list.innerHTML += `<div class="comment-item"><div class="comment-av" style="background:linear-gradient(135deg,var(--blue),var(--gold))">JN</div><div class="comment-bubble"><div class="comment-author">Jarme N.</div><div class="comment-text">${text}</div><div class="comment-actions"><button class="comment-action" onclick="toast('👍','info')">👍 Like</button><button class="comment-action">💬 Reply</button><span style="font-size:11px;color:var(--muted)">Just now</span></div></div></div>`;
-        document.getElementById("cc-" + pid).textContent =
-          postComments[pid].length;
-        input.value = "";
-        toast("💬 Comment posted!", "success");
-      }
-
-      // ===== POST MENU =====
-      function toggleMenu(pid) {
-        closeMenus();
-        document.getElementById("menu-" + pid)?.classList.toggle("open");
-      }
-      function closeMenus() {
-        document
-          .querySelectorAll(".post-menu-dropdown")
-          .forEach((m) => m.classList.remove("open"));
-      }
-      document.addEventListener("click", (e) => {
-        if (!e.target.closest(".post-menu-wrap")) closeMenus();
-      });
-
-      // ===== MY AUCTIONS =====
-      function renderMyAuct(tab) {
-        const items = myListings[tab] || [];
-        const c = document.getElementById("myAuctContent");
-        if (!items.length) {
-          c.innerHTML =
-            '<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">📦</div><div>No listings here.</div><button class="btn-submit" style="margin-top:16px" onclick="openModal()">＋ Post Auction</button></div>';
-          return;
-        }
-        c.innerHTML = items
-          .map(
-            (
-              item,
-              i,
-            ) => `<div class="card" style="display:flex;gap:14px;align-items:center;padding:14px">
-    <div style="width:56px;height:56px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${item.e}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
-      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
-      <div style="font-size:11px;color:var(--muted2);margin-top:2px">${item.b} bids · ${item.t} · ${item.c}</div>
-      <div class="listing-actions">
-        ${
-          tab === "active"
-            ? `<button class="listing-action-btn" onclick="toast('✏️ Edit listing','info')">✏️ Edit</button>
-        <button class="listing-action-btn" onclick="toast('📊 Viewing bids...','info')">📊 Bids (${item.b})</button>
-        <button class="listing-action-btn" onclick="toast('⚡ Listing promoted!','success')">⚡ Promote</button>
-        <button class="listing-action-btn danger" onclick="showConfirm('🗑️','Delete Listing','Delete this auction? This cannot be undone.','Delete',true,()=>{myListings.active.splice(${i},1);renderMyAuct(\'active\');toast(\'🗑️ Listing deleted\',\'error\')})">🗑️ Delete</button>`
-            : tab === "ended"
-              ? `<button class="listing-action-btn" onclick="openModal()">🔄 Relist</button><button class="listing-action-btn" onclick="toast('📊 View analytics','info')">📊 Analytics</button>`
-              : `<button class="listing-action-btn" onclick="toast('📦 Tracking: In Transit','info')">📦 Track</button><button class="listing-action-btn" onclick="toast('⭐ Review submitted!','success')">⭐ Review</button>`
-        }
-      </div>
-    </div>
-  </div>`,
-          )
-          .join("");
-      }
-
-      function myAuctTab(el, tab) {
-        document
-          .querySelectorAll(".tab-sw")
-          .forEach((t) => t.classList.remove("active"));
-        el.classList.add("active");
-        renderMyAuct(tab);
-      }
-
-      // ===== WATCHLIST =====
-      function renderWatchlist() {
-        const c = document.getElementById("watchlistContent");
-        if (!watchItems.length) {
-          c.innerHTML =
-            '<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">👁️</div><div>No items in watchlist.</div><button class="btn-submit" style="margin-top:16px" onclick="navigate(\'feed\')">Browse Auctions</button></div>';
-          return;
-        }
-        c.innerHTML = watchItems
-          .map(
-            (item, i) => `<div class="watchlist-item">
-    <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${item.e}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
-      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
-      <div style="font-size:11px;color:var(--muted2);margin-top:2px">by ${item.seller} · ${item.bids} bids · ⏰ ${item.time} left</div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <input style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;width:120px;outline:none" type="number" placeholder="₱ Your bid" id="wb-${i}">
-        <button class="bid-btn" style="padding:6px 14px;font-size:12px" onclick="wBid(${i})">Bid Now 🔥</button>
-        <button class="remove-watch" onclick="removeWatch(${i})">✕ Remove</button>
-      </div>
-    </div>
-  </div>`,
-          )
-          .join("");
-      }
-
-      function wBid(i) {
-        const v = document.getElementById("wb-" + i)?.value;
-        if (!v) {
-          toast("⚠️ Enter a bid", "error");
-          return;
-        }
-        showConfirm(
-          "🔥",
-          "Place Bid",
-          `Bid <strong>₱${parseInt(v).toLocaleString()}</strong>?`,
-          "Bid!",
-          false,
-          () => {
-            toast("🔥 Bid placed!", "success");
-            document.getElementById("wb-" + i).value = "";
-          },
-        );
-      }
-      function removeWatch(i) {
-        showConfirm(
-          "👁️",
-          "Remove",
-          "Remove this item from watchlist?",
-          "Remove",
-          true,
-          () => {
-            watchItems.splice(i, 1);
-            renderWatchlist();
-            toast("Removed from watchlist", "info");
-            document.getElementById("watchBadge").textContent =
-              watchItems.length;
-          },
-        );
-      }
-
-      // ===== WON AUCTIONS =====
-      function renderWon() {
-        const c = document.getElementById("wonContent");
-        c.innerHTML = wonItems
-          .map(
-            (item) => `<div class="won-item">
-    <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${item.e}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
-      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
-      <div style="font-size:11px;color:var(--muted2);margin-top:2px">from ${item.seller} · ${item.date} · <span style="color:${item.s === "Delivered" ? "var(--green)" : "var(--gold)"}">${item.s === "Delivered" ? "✓ Delivered" : "⏳ " + item.s}</span></div>
-    </div>
-    ${item.s === "Delivered" ? `<button class="bid-btn" style="padding:7px 14px;font-size:12px;flex-shrink:0" onclick="toast('⭐ Review submitted!','success')">⭐ Review</button>` : `<button class="bid-btn gold-btn" style="padding:7px 14px;font-size:12px;flex-shrink:0" onclick="toast('📦 Tracking: In Transit','info')">📦 Track</button>`}
-  </div>`,
-          )
-          .join("");
-      }
-
-      // ===== NOTIFICATIONS =====
-      function renderSidebarNotifs() {
-        const c = document.getElementById("sidebarNotifs");
-        c.innerHTML = notifs
-          .slice(0, 3)
-          .map(
-            (n) =>
-              `<div class="notif-item${n.read ? "" : " unread"}" onclick="markRead(${n.id})"><div class="notif-dot" style="background:${n.read ? "var(--muted)" : "var(--blue)"}"></div><div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div></div>`,
-          )
-          .join("");
-      }
-      function renderNotifs() {
-        const c = document.getElementById("notifContent");
-        c.innerHTML = notifs
-          .map(
-            (n) =>
-              `<div class="notif-item${n.read ? "" : " unread"}" onclick="markRead(${n.id})"><div style="font-size:24px;flex-shrink:0;width:40px;text-align:center">${n.icon}</div><div style="flex:1"><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>${!n.read ? '<div class="notif-dot" style="flex-shrink:0;margin:0"></div>' : ""}</div>`,
-          )
-          .join("");
-      }
-      function markRead(id) {
-        const n = notifs.find((x) => x.id === id);
-        if (n && !n.read) {
-          n.read = true;
-          notifCount = Math.max(0, notifCount - 1);
-          updateNB();
-          renderSidebarNotifs();
-          if (
-            document
-              .getElementById("page-notifications")
-              .classList.contains("active")
-          )
-            renderNotifs();
-        }
-      }
-      function markAllRead() {
-        notifs.forEach((n) => (n.read = true));
-        notifCount = 0;
-        updateNB();
-        renderSidebarNotifs();
-        renderNotifs();
-        toast("✅ All marked read", "success");
-      }
-      function updateNB() {
-        const b1 = document.getElementById("notifBadge"),
-          b2 = document.getElementById("notifNavBadge");
-        if (b1) {
-          b1.textContent = notifCount;
-          b1.style.display = notifCount ? "flex" : "none";
-        }
-        if (b2) {
-          b2.textContent = notifCount;
-          b2.style.display = notifCount ? "" : "none";
-        }
-      }
-      function addNotif(icon, text) {
-        notifs.unshift({
-          id: Date.now(),
-          read: false,
-          icon,
-          text,
-          time: "Just now",
-        });
-        notifCount++;
-        updateNB();
-        renderSidebarNotifs();
-      }
-
-      // ===== WALLET =====
-      function renderWallet() {
-        document.getElementById("walletBal").textContent =
-          "₱" + walletBal.toLocaleString() + ".00";
-        document.getElementById("txContent").innerHTML = txList
-          .map(
-            (t) => `<div class="tx-item">
-    <div class="tx-icon" style="background:${t.type === "credit" ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)"}">${t.icon}</div>
-    <div style="flex:1"><div class="tx-name">${t.name}</div><div class="tx-date">${t.date}</div></div>
-    <div class="tx-amount ${t.type}">${t.type === "credit" ? "+" : ""}₱${Math.abs(t.amt).toLocaleString()}</div>
-  </div>`,
-          )
-          .join("");
-      }
-
-      function walletAction(type) {
-        walletType = type;
-        const titles = {
-          add: "💳 Add Funds",
-          send: "↗️ Send Money",
-          withdraw: "↓ Withdraw",
-        };
-        const subs = {
-          add: "Add money to your BiliBid wallet",
-          send: "Send money to another user",
-          withdraw: "Withdraw to bank or e-wallet",
-        };
-        document.getElementById("wmTitle").textContent = titles[type];
-        document.getElementById("wmSub").textContent = subs[type];
-        document.getElementById("wmBtn").textContent =
-          type === "add" ? "Add Funds" : type === "send" ? "Send" : "Withdraw";
-        document.getElementById("wmExtra").innerHTML =
-          type === "send"
-            ? `<div class="form-group"><label class="form-label">Recipient Username</label><input class="form-input" id="wmRecip" placeholder="@username"></div>`
-            : type === "withdraw"
-              ? `<div class="form-group"><label class="form-label">Account Number</label><input class="form-input" id="wmAcct" placeholder="Account number"></div>`
-              : "";
-        document.getElementById("walletModal").classList.add("open");
-      }
-      function processWallet() {
-        const amt = parseInt(document.getElementById("wmAmt").value);
-        if (!amt || isNaN(amt) || amt <= 0) {
-          toast("⚠️ Enter a valid amount", "error");
-          return;
-        }
-        if (
-          (walletType === "withdraw" || walletType === "send") &&
-          amt > walletBal
-        ) {
-          toast("⚠️ Insufficient balance", "error");
-          return;
-        }
-        closeWM();
-        if (walletType === "add") {
-          walletBal += amt;
-          txList.unshift({
-            icon: "💳",
-            name: "Added via " + document.getElementById("wmMethod").value,
-            date: "Just now",
-            amt,
-            type: "credit",
-          });
-        } else {
-          walletBal -= amt;
-          txList.unshift({
-            icon: walletType === "send" ? "↗️" : "↓",
-            name: walletType === "send" ? "Sent Money" : "Withdrawal",
-            date: "Just now",
-            amt: -amt,
-            type: "debit",
-          });
-        }
-        renderWallet();
-        toast(
-          walletType === "add"
-            ? "✅ ₱" + amt.toLocaleString() + " added!"
-            : walletType === "send"
-              ? "↗️ Sent!"
-              : "↓ Withdrawal requested!",
-          "success",
-        );
-      }
-      function closeWM() {
-        document.getElementById("walletModal").classList.remove("open");
-        document.getElementById("wmAmt").value = "";
-      }
-
-      // ===== PROFILE =====
-      function saveProfile() {
-        document.getElementById("dispName").textContent =
-          document.getElementById("editName").value;
-        toast("✅ Profile saved!", "success");
-      }
-      function savePassword() {
-        toast("🔒 Password updated!", "success");
-      }
-
-      // ===== MODAL =====
-      function openModal() {
-        document.getElementById("postModal").classList.add("open");
-      }
-      function closeModal() {
-        document.getElementById("postModal").classList.remove("open");
-        document.getElementById("pTitle").value = "";
-        document.getElementById("pDesc").value = "";
-        document.getElementById("pBid").value = "";
-        document.getElementById("pBuyNow").value = "";
-        document.getElementById("upIcon").textContent = "📸";
-        document.getElementById("upText").innerHTML =
-          'Click to upload photos (up to 10 images)<br><span style="color:var(--muted);font-size:12px">JPG, PNG, WebP</span>';
-      }
-      function handleUpload(input) {
-        if (input.files.length) {
-          document.getElementById("upIcon").textContent = "✅";
-          document.getElementById("upText").textContent =
-            input.files.length + " photo(s) selected";
-        }
-      }
-      function submitPost() {
-        const title = document.getElementById("pTitle").value.trim();
-        const bid = parseInt(document.getElementById("pBid").value);
-        if (!title) {
-          toast("⚠️ Add a title", "error");
-          return;
-        }
-        if (!bid || isNaN(bid)) {
-          toast("⚠️ Set a starting bid", "error");
-          return;
-        }
-        closeModal();
-        const newPost = {
-          id: "np" + Date.now(),
-          av: "JN",
-          avbg: "linear-gradient(135deg,var(--blue),var(--gold))",
-          author: "Jarme Nathaniel",
-          verified: true,
-          badge: null,
-          time: "Just now",
-          cat: document.getElementById("pCat").value,
-          e: "🏷️",
-          title,
-          desc: document.getElementById("pDesc").value || "No description.",
-          tags: [
-            "✨ " + document.getElementById("pCond").value,
-            "📦 " + document.getElementById("pShip").value.split(" ")[0],
-          ],
-          bid,
-          bids: 0,
-          startBid: bid,
-          buyNow: parseInt(document.getElementById("pBuyNow").value) || null,
-          secs: 3600,
-          prog: 0,
-          live: false,
-          likes: 0,
-          filter: document.getElementById("pCat").value,
-        };
-        posts.unshift(newPost);
-        timers[newPost.id] = 3600;
-        postComments[newPost.id] = [];
-        myListings.active.unshift({
-          e: "🏷️",
-          n: title,
-          p: "₱" + bid.toLocaleString(),
-          b: 0,
-          t: "1h",
-          c: document.getElementById("pCond").value,
-        });
-        const cnt = document.getElementById("listedCount");
-        if (cnt) cnt.textContent = parseInt(cnt.textContent) + 1;
-        navigate("feed");
-        toast("🚀 Auction posted!", "success");
-        addNotif("🚀", 'Your auction "' + title + '" is now live!');
-      }
-
-      // ===== CHAT =====
-      function openChatByName(name) {
-        const data = chatData[name] || {
-          init: name.slice(0, 2).toUpperCase(),
-          bg: "linear-gradient(135deg,#4b5563,#374151)",
-          stat: "Unknown",
-          msgs: [],
-        };
-        currentChat = name;
-        document.getElementById("chatName").textContent = name;
-        document.getElementById("chatStat").textContent = data.stat;
-        const av = document.getElementById("chatAv");
-        av.textContent = data.init;
-        av.style.background = data.bg;
-        const msgsEl = document.getElementById("chatMsgs");
-        msgsEl.innerHTML = data.msgs
-          .map(
-            (m) =>
-              `<div class="msg ${m.t}">${m.tx}<div class="msg-time">${m.time}</div></div>`,
-          )
-          .join("");
-        document.getElementById("chatPopup").classList.add("open");
-        setTimeout(() => {
-          msgsEl.scrollTop = msgsEl.scrollHeight;
-        }, 50);
-      }
-
-      function closeChat() {
-        document.getElementById("chatPopup").classList.remove("open");
-      }
-
-      function sendMsg() {
-        const input = document.getElementById("chatIn");
-        const text = (input?.value || "").trim();
-        if (!text) return;
-        const now = new Date();
-        const time = now.toLocaleTimeString("en-PH", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        const msgsEl = document.getElementById("chatMsgs");
-        msgsEl.innerHTML += `<div class="msg me">${escapeHtml(text)}<div class="msg-time">${time}</div></div>`;
-        input.value = "";
-        msgsEl.scrollTop = msgsEl.scrollHeight;
-        if (!chatData[currentChat])
-          chatData[currentChat] = {
-            init: currentChat.slice(0, 2).toUpperCase(),
-            bg: "linear-gradient(135deg,#4b5563,#374151)",
-            stat: "",
-            msgs: [],
-          };
-        chatData[currentChat].msgs.push({ t: "me", tx: text, time });
-        setTimeout(() => {
-          const replies = [
-            "Got it, thanks! 😊",
-            "Sure, I will check that.",
-            "Can you send more photos?",
-            "Sounds good!",
-          ];
-          const r = replies[Math.floor(Math.random() * replies.length)];
-          msgsEl.innerHTML += `<div class="msg them">${r}<div class="msg-time">${time}</div></div>`;
-          msgsEl.scrollTop = msgsEl.scrollHeight;
-          chatData[currentChat].msgs.push({ t: "them", tx: r, time });
-        }, 900);
-      }
-
-      function escapeHtml(str) {
-        return String(str).replace(
-          /[&<>\"]/g,
-          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-        );
-      }
-
-      // ===== TOAST =====
-      function toast(msg, type) {
-        const t = document.getElementById("toast");
-        t.className = "toast show";
-        if (type) t.classList.add(type);
-        t.innerHTML = msg;
-        setTimeout(() => {
-          t.className = "toast";
-        }, 2500);
-      }
-
-      // ===== CONFIRM DIALOG =====
-      function showConfirm(icon, title, msg, okText, danger, cb) {
-        confirmCb = cb;
-        document.getElementById("cfIcon").textContent = icon;
-        document.getElementById("cfTitle").textContent = title;
-        document.getElementById("cfMsg").innerHTML = msg;
-        const ok = document.getElementById("cfOk");
-        ok.textContent = okText || "Confirm";
-        ok.classList.toggle("danger", !!danger);
-        document.getElementById("confirmOverlay").classList.add("open");
-      }
-      function runConfirm() {
-        if (confirmCb)
-          try {
-            confirmCb();
-          } catch (e) {}
-        closeConfirm();
-      }
-      function closeConfirm() {
-        confirmCb = null;
-        document.getElementById("confirmOverlay").classList.remove("open");
-      }
-
-      // ===== SEARCH HELPERS =====
-      function showSR() {
-        document.getElementById("searchResults").style.display = "block";
-      }
-      function hideSR() {
-        document.getElementById("searchResults").style.display = "none";
-      }
-      function handleSearch(q) {
-        const box = document.getElementById("searchResults");
-        if (!box) return;
-        const v = (q || "").toLowerCase();
-        if (!v) {
-          box.style.display = "none";
-          return;
-        }
-        const matches = posts
-          .filter(
-            (p) =>
-              p.title.toLowerCase().includes(v) ||
-              p.author.toLowerCase().includes(v),
-          )
-          .slice(0, 6);
-        box.innerHTML = matches
-          .map(
-            (m) =>
-              `<div class="search-result-item" onclick="navigate('feed');toast('🔎 Opened ${escapeHtml(m.title)}','info')"><div style="width:36px;height:36px;border-radius:8px;background:${m.avbg};display:flex;align-items:center;justify-content:center">${m.av}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">${escapeHtml(m.title)}</div><div style="font-size:12px;color:var(--muted2)">${escapeHtml(m.author)}</div></div></div>`,
-          )
-          .join("");
-        box.style.display = matches.length ? "block" : "none";
-      }
-
-      // ===== STARTUP =====
-      updateNB();
-      renderSidebarNotifs();
-      renderWallet();
-      renderFeed();
-      // expose some globals for debugging
-      window.navigate = navigate;
-      window.toast = toast;
-    </script>
+    <script src="BiliBid2.js"></script>
   </body>
 </html>
