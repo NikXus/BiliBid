@@ -1,0 +1,2576 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BiliBid — Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #070e1a;
+        --surface: #0d1929;
+        --surface2: #112038;
+        --surface3: #172944;
+        --border: rgba(255, 255, 255, 0.07);
+        --blue: #2563eb;
+        --blue-light: #3b82f6;
+        --gold: #f59e0b;
+        --gold-light: #fbbf24;
+        --green: #10b981;
+        --red: #ef4444;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --muted2: #94a3b8;
+        --accent: #1d4ed8;
+        --online: #22c55e;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* TOPBAR */
+      .topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: rgba(7, 14, 26, 0.95);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        height: 60px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 16px;
+      }
+      .logo {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 26px;
+        color: var(--text);
+        letter-spacing: 2px;
+      }
+      .logo span {
+        color: var(--gold);
+      }
+      .topbar-search {
+        flex: 1;
+        max-width: 380px;
+        margin: 0 16px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 8px 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted2);
+        font-size: 14px;
+      }
+      .topbar-search input {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-size: 14px;
+        width: 100%;
+        font-family: "DM Sans", sans-serif;
+      }
+      .topbar-search input::placeholder {
+        color: var(--muted);
+      }
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+      }
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 16px;
+        position: relative;
+      }
+      .icon-btn:hover {
+        background: var(--surface3);
+        border-color: var(--blue-light);
+      }
+      .badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        background: var(--red);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .avatar-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        border: 2px solid var(--gold);
+        position: relative;
+      }
+      .avatar-btn::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--bg);
+      }
+      .btn-post {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 8px 18px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+      .btn-post:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+      }
+
+      /* LAYOUT */
+      .layout {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        gap: 0;
+        padding-top: 60px;
+        min-height: 100vh;
+        width: 100%;
+      }
+
+      /* LEFT SIDEBAR */
+      .sidebar-left {
+        position: sticky;
+        top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: 20px 16px;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        width: 260px;
+        min-width: 0;
+      }
+      .sidebar-left::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-left::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .sidebar-left::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+
+      .profile-card {
+        background: var(--surface2);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid var(--border);
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .profile-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        margin: 0 auto 12px;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 800;
+        font-family: "Syne", sans-serif;
+        border: 3px solid var(--gold);
+        position: relative;
+      }
+      .profile-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 14px;
+        height: 14px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--surface2);
+      }
+      .profile-name {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 2px;
+      }
+      .profile-handle {
+        color: var(--muted2);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      .profile-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+      .stat {
+        background: var(--surface3);
+        border-radius: 10px;
+        padding: 8px 4px;
+        text-align: center;
+      }
+      .stat-num {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--gold);
+      }
+      .stat-label {
+        font-size: 10px;
+        color: var(--muted2);
+        margin-top: 2px;
+      }
+
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 20px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted2);
+      }
+      .nav-item:hover,
+      .nav-item.active {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .nav-item.active {
+        color: var(--blue-light);
+      }
+      .nav-icon {
+        font-size: 18px;
+        width: 24px;
+        text-align: center;
+      }
+      .nav-badge {
+        margin-left: auto;
+        background: var(--red);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 2px 7px;
+      }
+
+      .sidebar-section-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        padding: 0 14px;
+        margin: 16px 0 8px;
+      }
+
+      .category-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted2);
+        transition: all 0.2s;
+      }
+      .category-item:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .cat-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* MAIN FEED */
+      .main-feed {
+        padding: 24px 20px;
+        max-width: 680px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      main {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /* POST COMPOSER */
+      .composer {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      .composer-top {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .composer-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        border: 2px solid var(--gold);
+      }
+      .composer-input {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 10px 18px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        color: var(--muted2);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .composer-input:hover {
+        border-color: var(--blue-light);
+        color: var(--text);
+      }
+      .composer-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .composer-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted2);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .composer-btn:hover {
+        background: var(--surface3);
+        color: var(--text);
+        border-color: var(--blue-light);
+      }
+
+      /* AUCTION POST */
+      .auction-post {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        margin-bottom: 20px;
+        overflow: hidden;
+        transition: all 0.3s;
+      }
+      .auction-post:hover {
+        border-color: rgba(37, 99, 235, 0.3);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+      }
+      .post-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 16px 12px;
+      }
+      .post-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c3aed, #2563eb);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        border: 2px solid rgba(124, 58, 237, 0.5);
+      }
+      .post-avatar.gold {
+        background: linear-gradient(135deg, var(--gold), #ea580c);
+        border-color: rgba(245, 158, 11, 0.5);
+      }
+      .post-avatar.green {
+        background: linear-gradient(135deg, var(--green), #0891b2);
+        border-color: rgba(16, 185, 129, 0.5);
+      }
+      .post-meta {
+        flex: 1;
+      }
+      .post-author {
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .verified {
+        color: var(--blue-light);
+        font-size: 14px;
+      }
+      .seller-badge {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--gold);
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+      .post-time {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .post-menu {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--muted);
+        transition: all 0.2s;
+      }
+      .post-menu:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+
+      .post-product-img {
+        width: 100%;
+        height: 260px;
+        object-fit: cover;
+        background: linear-gradient(135deg, var(--surface2), var(--surface3));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 60px;
+        position: relative;
+        overflow: hidden;
+      }
+      .post-product-img::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to bottom,
+          transparent 50%,
+          rgba(7, 14, 26, 0.8)
+        );
+      }
+      .img-overlay {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(7, 14, 26, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: pulse 1.5s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+
+      .post-body {
+        padding: 16px;
+      }
+      .post-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin-bottom: 6px;
+      }
+      .post-desc {
+        font-size: 13px;
+        color: var(--muted2);
+        line-height: 1.6;
+        margin-bottom: 14px;
+      }
+      .post-tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .tag {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        color: var(--muted2);
+      }
+
+      .bid-section {
+        background: var(--surface2);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+      }
+      .bid-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .bid-label {
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .bid-amount {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--gold-light);
+      }
+      .bid-count {
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .timer {
+        display: flex;
+        gap: 8px;
+      }
+      .time-unit {
+        background: var(--surface3);
+        border-radius: 8px;
+        padding: 6px 10px;
+        text-align: center;
+        border: 1px solid var(--border);
+      }
+      .time-num {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 22px;
+        color: var(--text);
+        line-height: 1;
+      }
+      .time-label {
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .bid-progress {
+        height: 4px;
+        background: var(--surface3);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 10px;
+      }
+      .bid-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--blue), var(--gold));
+        border-radius: 4px;
+      }
+
+      .bid-input-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .bid-input {
+        flex: 1;
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 14px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .bid-input:focus {
+        border-color: var(--blue-light);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      .bid-btn {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .bid-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+      }
+      .bid-btn.gold-btn {
+        background: linear-gradient(135deg, var(--gold), #ea580c);
+      }
+      .bid-btn.gold-btn:hover {
+        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+      }
+
+      .post-actions {
+        display: flex;
+        gap: 0;
+        border-top: 1px solid var(--border);
+      }
+      .post-action {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 12px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted2);
+        transition: all 0.2s;
+        border-radius: 0;
+      }
+      .post-action:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .post-action.liked {
+        color: var(--red);
+      }
+      .post-action.watching {
+        color: var(--gold);
+      }
+
+      /* RIGHT SIDEBAR */
+      .sidebar-right {
+        position: sticky;
+        top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: 20px 16px;
+        border-left: 1px solid var(--border);
+        background: var(--surface);
+        width: 300px;
+        min-width: 0;
+      }
+      .sidebar-right::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-right::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .sidebar-right::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .section-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .section-link {
+        font-size: 12px;
+        color: var(--blue-light);
+        cursor: pointer;
+      }
+      .section-link:hover {
+        text-decoration: underline;
+      }
+
+      .my-auction-item {
+        background: var(--surface2);
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .my-auction-item:hover {
+        border-color: var(--blue-light);
+      }
+      .auction-thumb {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        background: var(--surface3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .auction-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .auction-name {
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .auction-price {
+        color: var(--gold);
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .auction-status {
+        font-size: 11px;
+        color: var(--muted2);
+      }
+      .status-live {
+        color: var(--red);
+      }
+      .status-won {
+        color: var(--green);
+      }
+      .status-ended {
+        color: var(--muted);
+      }
+
+      /* CHAT SECTION */
+      .chat-section {
+        margin-top: 24px;
+      }
+      .online-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 10px;
+        padding: 8px;
+      }
+      .online-user:hover {
+        background: var(--surface2);
+        padding-left: 10px;
+      }
+      .online-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .online-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid var(--surface);
+      }
+      .online-avatar.on::after {
+        background: var(--online);
+      }
+      .online-avatar.off::after {
+        background: var(--muted);
+      }
+      .online-avatar.busy::after {
+        background: var(--gold);
+      }
+      .online-name {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .online-status {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .online-status.on {
+        color: var(--green);
+      }
+
+      /* CHAT POPUP */
+      .chat-popup {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        z-index: 200;
+        overflow: hidden;
+        display: none;
+        flex-direction: column;
+      }
+      .chat-popup.open {
+        display: flex;
+      }
+      .chat-header {
+        background: var(--surface2);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .chat-header-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c3aed, #2563eb);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        position: relative;
+      }
+      .chat-header-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--surface2);
+      }
+      .chat-header-name {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .chat-header-status {
+        font-size: 11px;
+        color: var(--green);
+      }
+      .chat-close {
+        margin-left: auto;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--muted2);
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+      }
+      .chat-close:hover {
+        background: var(--surface3);
+        color: var(--text);
+      }
+      .chat-messages {
+        flex: 1;
+        padding: 14px;
+        height: 280px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .chat-messages::-webkit-scrollbar {
+        width: 4px;
+      }
+      .chat-messages::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+      .msg {
+        max-width: 75%;
+        padding: 10px 13px;
+        border-radius: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .msg.them {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 16px 16px 16px 4px;
+        align-self: flex-start;
+      }
+      .msg.me {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        border-radius: 16px 16px 4px 16px;
+        align-self: flex-end;
+      }
+      .msg-time {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .msg.me .msg-time {
+        text-align: right;
+      }
+      .chat-input-row {
+        padding: 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-top: 1px solid var(--border);
+        background: var(--surface2);
+      }
+      .chat-input {
+        flex: 1;
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 9px 14px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .chat-input:focus {
+        border-color: var(--blue-light);
+      }
+      .chat-send {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.2s;
+      }
+      .chat-send:hover {
+        transform: scale(1.1);
+      }
+
+      /* MODAL - Post Auction */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        z-index: 300;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        width: 90%;
+        max-width: 560px;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 28px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      }
+      .modal-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        margin-bottom: 6px;
+      }
+      .modal-sub {
+        font-size: 13px;
+        color: var(--muted2);
+        margin-bottom: 24px;
+      }
+      .form-group {
+        margin-bottom: 18px;
+      }
+      .form-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted2);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        display: block;
+      }
+      .form-input,
+      .form-select,
+      .form-textarea {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .form-input:focus,
+      .form-select:focus,
+      .form-textarea:focus {
+        border-color: var(--blue-light);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      .form-select option {
+        background: var(--surface2);
+      }
+      .form-textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .upload-area {
+        background: var(--surface2);
+        border: 2px dashed var(--border);
+        border-radius: 14px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .upload-area:hover {
+        border-color: var(--blue-light);
+        background: var(--surface3);
+      }
+      .upload-icon {
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+      .upload-text {
+        font-size: 13px;
+        color: var(--muted2);
+      }
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+      .btn-cancel {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-cancel:hover {
+        color: var(--text);
+        border-color: var(--text);
+      }
+      .btn-submit {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 50px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+      }
+
+      /* TICKER */
+      .ticker-wrap {
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        white-space: nowrap;
+        padding: 10px 0;
+      }
+      .ticker {
+        display: inline-flex;
+        gap: 48px;
+        animation: ticker 30s linear infinite;
+      }
+      @keyframes ticker {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+      .ticker-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .ticker-item span {
+        color: var(--gold);
+        font-weight: 600;
+      }
+
+      /* STORY/LIVE BAR */
+      .stories-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .stories-bar::-webkit-scrollbar {
+        height: 0;
+      }
+      .story-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .story-ring {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--gold), var(--blue));
+        padding: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .story-ring.live-ring {
+        background: linear-gradient(135deg, var(--red), #ff6b00);
+      }
+      .story-inner {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--surface2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        border: 3px solid var(--bg);
+      }
+      .story-name {
+        font-size: 11px;
+        color: var(--muted2);
+        text-align: center;
+        max-width: 60px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .story-label {
+        font-size: 10px;
+        color: var(--red);
+        font-weight: 700;
+      }
+
+      /* FILTER TABS */
+      .filter-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+      }
+      .filter-tabs::-webkit-scrollbar {
+        height: 0;
+      }
+      .filter-tab {
+        padding: 7px 16px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+      }
+      .filter-tab.active {
+        background: var(--blue);
+        color: #fff;
+        border-color: var(--blue);
+      }
+      .filter-tab:hover:not(.active) {
+        border-color: var(--blue-light);
+        color: var(--text);
+      }
+
+      /* BID HISTORY MINI */
+      .bid-history {
+        margin-top: 10px;
+      }
+      .bid-history-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .bid-history-item:last-child {
+        border-bottom: none;
+      }
+      .bh-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c3aed, #2563eb);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .bh-name {
+        font-size: 12px;
+        flex: 1;
+      }
+      .bh-amount {
+        font-size: 12px;
+        color: var(--gold);
+        font-weight: 700;
+      }
+      .bh-time {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      /* NOTIFICATIONS */
+      .notif-section {
+        margin-bottom: 24px;
+      }
+      .notif-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .notif-item:hover {
+        background: var(--surface2);
+      }
+      .notif-item.unread {
+        background: rgba(37, 99, 235, 0.07);
+        border: 1px solid rgba(37, 99, 235, 0.15);
+      }
+      .notif-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--blue);
+        flex-shrink: 0;
+        margin-top: 5px;
+      }
+      .notif-text {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted2);
+      }
+      .notif-text strong {
+        color: var(--text);
+      }
+      .notif-time {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      /* FLOATING CHAT BUBBLES */
+      .chat-bubbles {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 150;
+      }
+      .chat-bubble {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 18px;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        transition: all 0.2s;
+        position: relative;
+        border: 3px solid var(--bg);
+      }
+      .chat-bubble:hover {
+        transform: scale(1.1);
+      }
+      .chat-bubble .unread-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 16px;
+        height: 16px;
+        background: var(--red);
+        border-radius: 50%;
+        font-size: 9px;
+        color: #fff;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--bg);
+      }
+
+      .emoji-bg-1 {
+        background: linear-gradient(135deg, #7c3aed, #2563eb);
+      }
+      .emoji-bg-2 {
+        background: linear-gradient(135deg, var(--gold), #ea580c);
+      }
+      .emoji-bg-3 {
+        background: linear-gradient(135deg, var(--green), #0891b2);
+      }
+
+      /* TOAST */
+      .toast {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--surface2);
+        border: 1px solid var(--green);
+        border-radius: 50px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--green);
+        z-index: 400;
+        opacity: 0;
+        transition: all 0.3s;
+        pointer-events: none;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="logo">Bili<span>Bid</span></div>
+      <div class="topbar-search">
+        <span>🔍</span>
+        <input type="text" placeholder="Search auctions, sellers, items..." />
+      </div>
+      <div class="topbar-actions">
+        <div class="icon-btn" onclick="showToast('🔔 No new notifications')">
+          🔔
+          <div class="badge">3</div>
+        </div>
+        <div class="icon-btn" onclick="openChat()">
+          💬
+          <div class="badge">2</div>
+        </div>
+        <div class="icon-btn" onclick="showToast('🛒 Your watchlist: 5 items')">
+          🏷️
+        </div>
+        <button class="btn-post" onclick="openModal()">＋ Post Auction</button>
+        <div class="avatar-btn">JN</div>
+      </div>
+    </div>
+
+    <!-- LAYOUT -->
+    <div class="layout">
+      <!-- LEFT SIDEBAR -->
+      <aside class="sidebar-left">
+        <div class="profile-card">
+          <div class="profile-avatar">JN</div>
+          <div class="profile-name">Jarme Nathaniel</div>
+          <div class="profile-handle">@jarmenathaniel · ⭐ 4.9</div>
+          <div class="profile-stats">
+            <div class="stat">
+              <div class="stat-num">24</div>
+              <div class="stat-label">Listed</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">18</div>
+              <div class="stat-label">Sold</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">152</div>
+              <div class="stat-label">Bids</div>
+            </div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-item active">
+            <span class="nav-icon">🏠</span> Feed
+          </div>
+          <div class="nav-item" onclick="showToast('📦 My Auctions')">
+            <span class="nav-icon">📦</span> My Auctions
+            <span class="nav-badge">3</span>
+          </div>
+          <div class="nav-item" onclick="showToast('👁️ Watching 5 items')">
+            <span class="nav-icon">👁️</span> Watchlist
+            <span class="nav-badge">5</span>
+          </div>
+          <div class="nav-item" onclick="showToast('🏆 Won 7 auctions')">
+            <span class="nav-icon">🏆</span> Won Auctions
+          </div>
+          <div class="nav-item" onclick="showToast('💬 Messages')">
+            <span class="nav-icon">💬</span> Messages
+            <span class="nav-badge">2</span>
+          </div>
+          <div class="nav-item" onclick="showToast('💰 Wallet: ₱12,500')">
+            <span class="nav-icon">💰</span> Wallet
+          </div>
+          <div class="nav-item" onclick="showToast('👤 Profile Settings')">
+            <span class="nav-icon">👤</span> Profile
+          </div>
+        </nav>
+
+        <div class="sidebar-section-title">Categories</div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #3b82f6"></span> Electronics
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #f59e0b"></span> Fashion &
+          Bags
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #10b981"></span> Sneakers
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #8b5cf6"></span> Collectibles
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #ef4444"></span> Gaming
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #06b6d4"></span> Cameras
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #f97316"></span> Watches
+        </div>
+        <div class="category-item">
+          <span class="cat-dot" style="background: #ec4899"></span> Jewelry
+        </div>
+      </aside>
+
+      <!-- MAIN FEED -->
+      <main>
+        <!-- TICKER -->
+        <div class="ticker-wrap">
+          <div class="ticker">
+            <div class="ticker-item">
+              🔥 iPhone 15 Pro Max — <span>₱28,500</span>
+            </div>
+            <div class="ticker-item">
+              👟 Jordan 1 Retro — <span>₱4,200</span>
+            </div>
+            <div class="ticker-item">
+              💻 MacBook Air M2 — <span>₱62,000</span>
+            </div>
+            <div class="ticker-item">
+              👜 Vintage LV Bag — <span>₱15,000</span>
+            </div>
+            <div class="ticker-item">
+              🎮 PS5 DualSense — <span>₱2,800</span>
+            </div>
+            <div class="ticker-item">📷 Sony A7 IV — <span>₱45,000</span></div>
+            <div class="ticker-item">
+              ⌚ Casio G-Shock — <span>₱3,100</span>
+            </div>
+            <div class="ticker-item">
+              🔥 iPhone 15 Pro Max — <span>₱28,500</span>
+            </div>
+            <div class="ticker-item">
+              👟 Jordan 1 Retro — <span>₱4,200</span>
+            </div>
+            <div class="ticker-item">
+              💻 MacBook Air M2 — <span>₱62,000</span>
+            </div>
+            <div class="ticker-item">
+              👜 Vintage LV Bag — <span>₱15,000</span>
+            </div>
+            <div class="ticker-item">
+              🎮 PS5 DualSense — <span>₱2,800</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="main-feed">
+          <!-- STORIES/LIVE BAR -->
+          <div class="stories-bar">
+            <div
+              class="story-item"
+              onclick="showToast('🎬 Going LIVE soon...')"
+            >
+              <div
+                class="story-ring"
+                style="background: var(--surface3); padding: 2px"
+              >
+                <div
+                  class="story-inner"
+                  style="
+                    font-size: 28px;
+                    background: linear-gradient(
+                      135deg,
+                      var(--blue),
+                      var(--accent)
+                    );
+                  "
+                >
+                  ＋
+                </div>
+              </div>
+              <div class="story-name">Go Live</div>
+            </div>
+            <div
+              class="story-item"
+              onclick="showToast('🔴 LIVE: Maria selling shoes!')"
+            >
+              <div class="story-ring live-ring">
+                <div class="story-inner">👟</div>
+              </div>
+              <div class="story-name">MariaSells</div>
+              <div class="story-label">LIVE</div>
+            </div>
+            <div
+              class="story-item"
+              onclick="showToast('🔴 LIVE: TechHub auction!')"
+            >
+              <div class="story-ring live-ring">
+                <div class="story-inner">📱</div>
+              </div>
+              <div class="story-name">TechHub</div>
+              <div class="story-label">LIVE</div>
+            </div>
+            <div class="story-item">
+              <div class="story-ring"><div class="story-inner">💻</div></div>
+              <div class="story-name">GadgetPH</div>
+            </div>
+            <div class="story-item">
+              <div class="story-ring"><div class="story-inner">👜</div></div>
+              <div class="story-name">LuxuryMNL</div>
+            </div>
+            <div class="story-item">
+              <div class="story-ring"><div class="story-inner">🎮</div></div>
+              <div class="story-name">GamersHub</div>
+            </div>
+            <div class="story-item">
+              <div class="story-ring"><div class="story-inner">⌚</div></div>
+              <div class="story-name">WatchPH</div>
+            </div>
+          </div>
+
+          <!-- COMPOSER -->
+          <div class="composer">
+            <div class="composer-top">
+              <div class="composer-avatar">JN</div>
+              <div class="composer-input" onclick="openModal()">
+                What are you selling today, Jarme?
+              </div>
+            </div>
+            <div class="composer-actions">
+              <div class="composer-btn" onclick="openModal()">📸 Add Photo</div>
+              <div class="composer-btn" onclick="openModal()">🏷️ Set Price</div>
+              <div class="composer-btn" onclick="openModal()">⏱️ Duration</div>
+              <div class="composer-btn" onclick="openModal()">🎮 Category</div>
+            </div>
+          </div>
+
+          <!-- FILTER TABS -->
+          <div class="filter-tabs">
+            <div class="filter-tab active">All</div>
+            <div class="filter-tab" onclick="setTab(this)">Ending Soon</div>
+            <div class="filter-tab" onclick="setTab(this)">Electronics</div>
+            <div class="filter-tab" onclick="setTab(this)">Sneakers</div>
+            <div class="filter-tab" onclick="setTab(this)">Fashion</div>
+            <div class="filter-tab" onclick="setTab(this)">Gaming</div>
+            <div class="filter-tab" onclick="setTab(this)">Following</div>
+          </div>
+
+          <!-- POST 1 -->
+          <div class="auction-post">
+            <div class="post-header">
+              <div class="post-avatar">MR</div>
+              <div class="post-meta">
+                <div class="post-author">
+                  Maria Reyes <span class="verified">✓</span>
+                  <span class="seller-badge">⭐ Top Seller</span>
+                </div>
+                <div class="post-time">2 hours ago · Electronics</div>
+              </div>
+              <div class="post-menu">···</div>
+            </div>
+
+            <div class="post-product-img">
+              📱
+              <div class="img-overlay">
+                <div class="live-dot"></div>
+                LIVE AUCTION
+              </div>
+            </div>
+
+            <div class="post-body">
+              <div class="post-title">
+                iPhone 15 Pro Max 256GB — Deep Titanium
+              </div>
+              <div class="post-desc">
+                Brand new, sealed in box. Apple PH warranty. Bought as a gift
+                but already have one. Complete with original receipt.
+              </div>
+              <div class="post-tags">
+                <span class="tag">📱 iPhone</span>
+                <span class="tag">✨ Brand New</span>
+                <span class="tag">📦 Free Shipping</span>
+                <span class="tag">🇵🇭 Metro Manila</span>
+              </div>
+
+              <div class="bid-section">
+                <div class="bid-row">
+                  <div>
+                    <div class="bid-label">Current Bid</div>
+                    <div class="bid-amount">₱28,500</div>
+                    <div class="bid-count">47 bids · 23 watchers</div>
+                  </div>
+                  <div>
+                    <div class="bid-label">Time Left</div>
+                    <div class="timer">
+                      <div class="time-unit">
+                        <div class="time-num" id="h1">02</div>
+                        <div class="time-label">hrs</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num" id="m1">09</div>
+                        <div class="time-label">min</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num" id="s1">24</div>
+                        <div class="time-label">sec</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bid-progress">
+                  <div class="bid-progress-fill" style="width: 78%"></div>
+                </div>
+                <div
+                  style="font-size: 11px; color: var(--muted2); margin-top: 6px"
+                >
+                  Starting bid: ₱20,000 · Buy Now: ₱32,000
+                </div>
+              </div>
+
+              <div class="bid-history">
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--muted2);
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  Recent Bids
+                </div>
+                <div class="bid-history-item">
+                  <div
+                    class="bh-avatar"
+                    style="
+                      background: linear-gradient(135deg, #7c3aed, #2563eb);
+                    "
+                  >
+                    KL
+                  </div>
+                  <div class="bh-name">Karl L.</div>
+                  <div class="bh-amount">₱28,500</div>
+                  <div class="bh-time">2m ago</div>
+                </div>
+                <div class="bid-history-item">
+                  <div
+                    class="bh-avatar"
+                    style="
+                      background: linear-gradient(
+                        135deg,
+                        var(--green),
+                        #0891b2
+                      );
+                    "
+                  >
+                    JP
+                  </div>
+                  <div class="bh-name">Jun P.</div>
+                  <div class="bh-amount">₱27,800</div>
+                  <div class="bh-time">5m ago</div>
+                </div>
+                <div class="bid-history-item">
+                  <div
+                    class="bh-avatar"
+                    style="
+                      background: linear-gradient(135deg, var(--gold), #ea580c);
+                    "
+                  >
+                    AN
+                  </div>
+                  <div class="bh-name">Ana N.</div>
+                  <div class="bh-amount">₱27,000</div>
+                  <div class="bh-time">11m ago</div>
+                </div>
+              </div>
+
+              <div class="bid-input-row" style="margin-top: 14px">
+                <input
+                  class="bid-input"
+                  type="text"
+                  placeholder="₱ Enter your bid (min. ₱29,000)"
+                  id="bid1"
+                />
+                <button class="bid-btn" onclick="placeBid('bid1')">
+                  Place Bid 🔥
+                </button>
+              </div>
+              <button
+                class="bid-btn gold-btn"
+                style="width: 100%; padding: 12px"
+                onclick="showToast('⚡ Buy Now for ₱32,000 — Confirm?')"
+              >
+                ⚡ Buy Now — ₱32,000
+              </button>
+            </div>
+
+            <div class="post-actions">
+              <div class="post-action" onclick="toggleLike(this)">
+                ❤️ 84 Likes
+              </div>
+              <div
+                class="post-action"
+                onclick="showToast('💬 Comments loading...')"
+              >
+                💬 32 Comments
+              </div>
+              <div
+                class="post-action watching"
+                onclick="showToast('👁️ Added to Watchlist!')"
+              >
+                👁️ Watch
+              </div>
+              <div class="post-action" onclick="showToast('🔗 Link copied!')">
+                ↗️ Share
+              </div>
+            </div>
+          </div>
+
+          <!-- POST 2 -->
+          <div class="auction-post">
+            <div class="post-header">
+              <div class="post-avatar gold">TH</div>
+              <div class="post-meta">
+                <div class="post-author">
+                  TechHub PH <span class="verified">✓</span>
+                </div>
+                <div class="post-time">5 hours ago · Computers</div>
+              </div>
+              <div class="post-menu">···</div>
+            </div>
+
+            <div class="post-product-img">💻</div>
+
+            <div class="post-body">
+              <div class="post-title">MacBook Air M2 — Midnight, 8GB/256GB</div>
+              <div class="post-desc">
+                Unit only, complete accessories, international warranty. 2
+                months old, mint condition. Upgrading to Pro.
+              </div>
+              <div class="post-tags">
+                <span class="tag">💻 MacBook</span>
+                <span class="tag">🍎 Apple M2</span>
+                <span class="tag">✅ Verified Seller</span>
+              </div>
+
+              <div class="bid-section">
+                <div class="bid-row">
+                  <div>
+                    <div class="bid-label">Current Bid</div>
+                    <div class="bid-amount">₱62,000</div>
+                    <div class="bid-count">31 bids · 18 watchers</div>
+                  </div>
+                  <div>
+                    <div class="bid-label">Time Left</div>
+                    <div class="timer">
+                      <div class="time-unit">
+                        <div class="time-num">18</div>
+                        <div class="time-label">hrs</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num">44</div>
+                        <div class="time-label">min</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num">07</div>
+                        <div class="time-label">sec</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bid-progress">
+                  <div class="bid-progress-fill" style="width: 45%"></div>
+                </div>
+              </div>
+
+              <div class="bid-input-row" style="margin-top: 14px">
+                <input
+                  class="bid-input"
+                  type="text"
+                  placeholder="₱ Enter your bid (min. ₱63,000)"
+                  id="bid2"
+                />
+                <button class="bid-btn" onclick="placeBid('bid2')">
+                  Place Bid 🔥
+                </button>
+              </div>
+            </div>
+
+            <div class="post-actions">
+              <div class="post-action liked">❤️ 112 Likes</div>
+              <div
+                class="post-action"
+                onclick="showToast('💬 Comments loading...')"
+              >
+                💬 47 Comments
+              </div>
+              <div
+                class="post-action"
+                onclick="showToast('👁️ Added to Watchlist!')"
+              >
+                👁️ Watch
+              </div>
+              <div class="post-action" onclick="showToast('🔗 Link copied!')">
+                ↗️ Share
+              </div>
+            </div>
+          </div>
+
+          <!-- POST 3 -->
+          <div class="auction-post">
+            <div class="post-header">
+              <div class="post-avatar green">KS</div>
+              <div class="post-meta">
+                <div class="post-author">Karl Sneaker PH</div>
+                <div class="post-time">1 day ago · Sneakers</div>
+              </div>
+              <div class="post-menu">···</div>
+            </div>
+
+            <div class="post-product-img">👟</div>
+
+            <div class="post-body">
+              <div class="post-title">
+                Nike Air Jordan 1 Retro High OG "Chicago"
+              </div>
+              <div class="post-desc">
+                Pre-loved, worn once. US10 / EU44. 100% authentic with receipt.
+                Original box included. No box damage.
+              </div>
+              <div class="post-tags">
+                <span class="tag">👟 Jordan 1</span>
+                <span class="tag">🔥 Rare</span>
+                <span class="tag">📦 With Box</span>
+                <span class="tag">💯 Legit Check</span>
+              </div>
+
+              <div class="bid-section">
+                <div class="bid-row">
+                  <div>
+                    <div class="bid-label">Current Bid</div>
+                    <div class="bid-amount">₱4,200</div>
+                    <div class="bid-count">23 bids · 41 watchers</div>
+                  </div>
+                  <div>
+                    <div class="bid-label">Time Left</div>
+                    <div class="timer">
+                      <div class="time-unit">
+                        <div class="time-num">00</div>
+                        <div class="time-label">hrs</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num">40</div>
+                        <div class="time-label">min</div>
+                      </div>
+                      <div class="time-unit">
+                        <div class="time-num" id="s3">02</div>
+                        <div class="time-label">sec</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bid-progress">
+                  <div
+                    class="bid-progress-fill"
+                    style="
+                      width: 92%;
+                      background: linear-gradient(
+                        90deg,
+                        var(--red),
+                        var(--gold)
+                      );
+                    "
+                  ></div>
+                </div>
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--red);
+                    margin-top: 6px;
+                    font-weight: 600;
+                  "
+                >
+                  ⚠️ Ending very soon!
+                </div>
+              </div>
+
+              <div class="bid-input-row" style="margin-top: 14px">
+                <input
+                  class="bid-input"
+                  type="text"
+                  placeholder="₱ Enter your bid (min. ₱4,300)"
+                  id="bid3"
+                />
+                <button
+                  class="bid-btn"
+                  style="
+                    background: linear-gradient(135deg, var(--red), #c2410c);
+                  "
+                  onclick="placeBid('bid3')"
+                >
+                  ⚡ Bid NOW!
+                </button>
+              </div>
+            </div>
+
+            <div class="post-actions">
+              <div class="post-action" onclick="toggleLike(this)">
+                ❤️ 67 Likes
+              </div>
+              <div
+                class="post-action"
+                onclick="showToast('💬 Comments loading...')"
+              >
+                💬 19 Comments
+              </div>
+              <div class="post-action watching">👁️ Watching</div>
+              <div class="post-action" onclick="showToast('🔗 Link copied!')">
+                ↗️ Share
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- end main-feed -->
+      </main>
+
+      <!-- RIGHT SIDEBAR -->
+      <aside class="sidebar-right">
+        <!-- NOTIFICATIONS -->
+        <div class="notif-section">
+          <div class="section-header">
+            <div class="section-title">🔔 Notifications</div>
+            <div class="section-link">Mark all read</div>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-dot"></div>
+            <div>
+              <div class="notif-text">
+                <strong>KarlSneakers</strong> outbid you on Jordan 1 Retro!
+              </div>
+              <div class="notif-time">2 minutes ago</div>
+            </div>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-dot"></div>
+            <div>
+              <div class="notif-text">
+                <strong>Your auction</strong> for PS5 Controller ends in 1 hour!
+              </div>
+              <div class="notif-time">1 hour ago</div>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-dot" style="background: var(--green)"></div>
+            <div>
+              <div class="notif-text">
+                <strong>Ana N.</strong> won your MacBook Pro listing. ₱72,000 🎉
+              </div>
+              <div class="notif-time">Yesterday</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MY ACTIVE AUCTIONS -->
+        <div class="section-header">
+          <div class="section-title">📦 My Active Listings</div>
+          <div
+            class="section-link"
+            onclick="showToast('📦 Opening My Auctions...')"
+          >
+            See all
+          </div>
+        </div>
+
+        <div class="my-auction-item">
+          <div class="auction-thumb">🎮</div>
+          <div class="auction-info">
+            <div class="auction-name">PS5 DualSense Controller</div>
+            <div class="auction-price">₱2,800</div>
+            <div class="auction-status">
+              <span class="status-live">● LIVE</span> · 12 bids · 1d 2h left
+            </div>
+          </div>
+        </div>
+        <div class="my-auction-item">
+          <div class="auction-thumb">📷</div>
+          <div class="auction-info">
+            <div class="auction-name">Sony Camera Lens 50mm</div>
+            <div class="auction-price">₱5,500</div>
+            <div class="auction-status">
+              <span class="status-live">● LIVE</span> · 8 bids · 3h left
+            </div>
+          </div>
+        </div>
+        <div class="my-auction-item">
+          <div class="auction-thumb">⌚</div>
+          <div class="auction-info">
+            <div class="auction-name">Casio G-Shock DW5600</div>
+            <div class="auction-price">₱3,100</div>
+            <div class="auction-status">
+              <span class="status-won">✓ Sold!</span> · Final
+            </div>
+          </div>
+        </div>
+
+        <!-- ONLINE CONTACTS / CHAT -->
+        <div class="chat-section">
+          <div
+            class="section-header"
+            style="margin-top: 20px; margin-bottom: 10px"
+          >
+            <div class="section-title">💬 Contacts</div>
+            <div class="section-link">New chat</div>
+          </div>
+
+          <div
+            class="online-user"
+            onclick="openChat('MariaSells', 'MS', 'emoji-bg-2')"
+          >
+            <div
+              class="online-avatar on emoji-bg-2"
+              style="background: linear-gradient(135deg, var(--gold), #ea580c)"
+            >
+              MS
+            </div>
+            <div>
+              <div class="online-name">MariaSells</div>
+              <div class="online-status on">Active now</div>
+            </div>
+          </div>
+          <div
+            class="online-user"
+            onclick="openChat('TechHub PH', 'TH', 'emoji-bg-1')"
+          >
+            <div
+              class="online-avatar on emoji-bg-1"
+              style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
+            >
+              TH
+            </div>
+            <div>
+              <div class="online-name">TechHub PH</div>
+              <div class="online-status on">Active now</div>
+            </div>
+          </div>
+          <div
+            class="online-user"
+            onclick="openChat('Karl Sneakers', 'KS', 'emoji-bg-3')"
+          >
+            <div
+              class="online-avatar busy emoji-bg-3"
+              style="background: linear-gradient(135deg, var(--green), #0891b2)"
+            >
+              KS
+            </div>
+            <div>
+              <div class="online-name">Karl Sneakers</div>
+              <div class="online-status" style="color: var(--gold)">
+                In auction
+              </div>
+            </div>
+          </div>
+          <div class="online-user" onclick="showToast('💬 Opening chat...')">
+            <div
+              class="online-avatar off"
+              style="background: linear-gradient(135deg, #4b5563, #374151)"
+            >
+              JD
+            </div>
+            <div>
+              <div class="online-name">Juan Dela Cruz</div>
+              <div class="online-status">Active 3h ago</div>
+            </div>
+          </div>
+          <div class="online-user" onclick="showToast('💬 Opening chat...')">
+            <div
+              class="online-avatar off"
+              style="background: linear-gradient(135deg, #ec4899, #8b5cf6)"
+            >
+              AN
+            </div>
+            <div>
+              <div class="online-name">Ana Navarro</div>
+              <div class="online-status">Active yesterday</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUGGESTED SELLERS -->
+        <div style="margin-top: 20px">
+          <div class="section-header">
+            <div class="section-title">✨ Suggested Sellers</div>
+          </div>
+          <div
+            style="
+              background: var(--surface2);
+              border-radius: 14px;
+              padding: 14px;
+              border: 1px solid var(--border);
+            "
+          >
+            <div
+              style="
+                font-size: 12px;
+                color: var(--gold);
+                font-weight: 700;
+                margin-bottom: 8px;
+              "
+            >
+              🏷️ LuxuryMNL
+            </div>
+            <div style="font-size: 12px; color: var(--muted2)">
+              Designer bags, watches & jewelry. 98% positive feedback.
+            </div>
+            <button
+              class="bid-btn"
+              style="margin-top: 10px; width: 100%; padding: 8px"
+              onclick="showToast('✅ Following LuxuryMNL!')"
+            >
+              + Follow Seller
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- CHAT POPUP -->
+    <div class="chat-popup" id="chatPopup">
+      <div class="chat-header">
+        <div class="chat-header-avatar" id="chatAvatar">MS</div>
+        <div>
+          <div class="chat-header-name" id="chatName">MariaSells</div>
+          <div class="chat-header-status">Active now</div>
+        </div>
+        <div class="chat-close" onclick="closeChat()">✕</div>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg them">
+          Hi! Is the iPhone still available? 😊
+          <div class="msg-time">2:34 PM</div>
+        </div>
+        <div class="msg me">
+          Yes it is! Auction ends in 2 hours. You can bid now or buy directly 🔥
+          <div class="msg-time">2:36 PM</div>
+        </div>
+        <div class="msg them">
+          What's the lowest you can go for Buy Now?
+          <div class="msg-time">2:37 PM</div>
+        </div>
+        <div class="msg me">
+          Best I can do is ₱31,000. The auction price might go lower depending
+          on bids!
+          <div class="msg-time">2:38 PM</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input
+          class="chat-input"
+          type="text"
+          id="chatInput"
+          placeholder="Type a message..."
+          onkeydown="if (event.key === 'Enter') sendMsg();"
+        />
+        <button class="chat-send" onclick="sendMsg()">➤</button>
+      </div>
+    </div>
+
+    <!-- FLOATING CHAT BUBBLES -->
+    <div class="chat-bubbles">
+      <div
+        class="chat-bubble emoji-bg-2"
+        onclick="openChat('MariaSells', 'MS', 'emoji-bg-2')"
+        style="background: linear-gradient(135deg, var(--gold), #ea580c)"
+      >
+        MS
+        <div class="unread-dot">2</div>
+      </div>
+      <div
+        class="chat-bubble emoji-bg-1"
+        onclick="openChat('TechHub PH', 'TH', 'emoji-bg-1')"
+        style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
+      >
+        TH
+      </div>
+    </div>
+
+    <!-- POST AUCTION MODAL -->
+    <div class="modal-overlay" id="modal">
+      <div class="modal">
+        <div class="modal-title">🏷️ Post New Auction</div>
+        <div class="modal-sub">
+          List your item and let buyers compete for the best price.
+        </div>
+
+        <div class="upload-area">
+          <div class="upload-icon">📸</div>
+          <div class="upload-text">
+            Click to upload photos (up to 10 images)<br /><span
+              style="color: var(--muted); font-size: 12px"
+              >JPG, PNG, WebP · Max 10MB each</span
+            >
+          </div>
+        </div>
+
+        <div style="margin-top: 18px">
+          <div class="form-group">
+            <label class="form-label">Item Title</label>
+            <input
+              class="form-input"
+              type="text"
+              placeholder="e.g., iPhone 15 Pro Max 256GB Deep Titanium"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea
+              class="form-textarea"
+              placeholder="Describe your item's condition, included accessories, and any defects..."
+            ></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category</label>
+              <select class="form-select">
+                <option>Electronics</option>
+                <option>Sneakers</option>
+                <option>Fashion & Bags</option>
+                <option>Gaming</option>
+                <option>Cameras</option>
+                <option>Watches</option>
+                <option>Collectibles</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Condition</label>
+              <select class="form-select">
+                <option>Brand New</option>
+                <option>Like New</option>
+                <option>Pre-loved (Good)</option>
+                <option>Pre-loved (Fair)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Starting Bid (₱)</label>
+              <input class="form-input" type="number" placeholder="₱0.00" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Buy Now Price (₱)</label>
+              <input class="form-input" type="number" placeholder="Optional" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Auction Duration</label>
+            <select class="form-select">
+              <option>1 hour</option>
+              <option>3 hours</option>
+              <option>6 hours</option>
+              <option>12 hours</option>
+              <option>1 day</option>
+              <option>3 days</option>
+              <option>7 days</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Shipping Options</label>
+            <select class="form-select">
+              <option>Free Shipping (Metro Manila)</option>
+              <option>Buyer Pays Shipping</option>
+              <option>Meet Up Only</option>
+              <option>Shipping PH-wide</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-submit" onclick="submitPost()">
+            🚀 Post Auction
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // Timer countdown
+      function countdown() {
+        const secs = ["s1"];
+        secs.forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          let v = parseInt(el.textContent);
+          v = v > 0 ? v - 1 : 59;
+          el.textContent = String(v).padStart(2, "0");
+        });
+      }
+      setInterval(countdown, 1000);
+
+      // Toast
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 2500);
+      }
+
+      // Modal
+      function openModal() {
+        document.getElementById("modal").classList.add("open");
+      }
+      function closeModal() {
+        document.getElementById("modal").classList.remove("open");
+      }
+      function submitPost() {
+        closeModal();
+        showToast("🎉 Auction posted successfully!");
+      }
+
+      // Chat
+      let chatOpen = false;
+      function openChat(
+        name = "MariaSells",
+        initials = "MS",
+        bg = "emoji-bg-2",
+      ) {
+        const popup = document.getElementById("chatPopup");
+        document.getElementById("chatName").textContent = name;
+        const av = document.getElementById("chatAvatar");
+        av.textContent = initials;
+        popup.classList.add("open");
+        chatOpen = true;
+        setTimeout(() => {
+          const msgs = document.getElementById("chatMessages");
+          msgs.scrollTop = msgs.scrollHeight;
+        }, 50);
+      }
+      function closeChat() {
+        document.getElementById("chatPopup").classList.remove("open");
+        chatOpen = false;
+      }
+      function sendMsg() {
+        const input = document.getElementById("chatInput");
+        const text = input.value.trim();
+        if (!text) return;
+        const msgs = document.getElementById("chatMessages");
+        const now = new Date();
+        const time = now.toLocaleTimeString("en-PH", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        msgs.innerHTML += `<div class="msg me">${text}<div class="msg-time">${time}</div></div>`;
+        input.value = "";
+        msgs.scrollTop = msgs.scrollHeight;
+        setTimeout(() => {
+          const replies = [
+            "Got it, thanks! 😊",
+            "Sure, I'll check that out!",
+            "Can you send more photos?",
+            "Is meet up possible in Makati?",
+            "That sounds fair to me!",
+          ];
+          msgs.innerHTML += `<div class="msg them">${replies[Math.floor(Math.random() * replies.length)]}<div class="msg-time">${time}</div></div>`;
+          msgs.scrollTop = msgs.scrollHeight;
+        }, 1200);
+      }
+
+      // Bid
+      function placeBid(inputId) {
+        const val = document.getElementById(inputId).value.trim();
+        if (!val) {
+          showToast("⚠️ Please enter a bid amount first!");
+          return;
+        }
+        showToast(`🔥 Bid of ₱${val} placed successfully!`);
+        document.getElementById(inputId).value = "";
+      }
+
+      // Like toggle
+      function toggleLike(el) {
+        el.classList.toggle("liked");
+        el.style.color = el.classList.contains("liked") ? "var(--red)" : "";
+        showToast(
+          el.classList.contains("liked")
+            ? "❤️ Added to Likes!"
+            : "💔 Removed from Likes",
+        );
+      }
+
+      // Filter tab
+      function setTab(el) {
+        document
+          .querySelectorAll(".filter-tab")
+          .forEach((t) => t.classList.remove("active"));
+        el.classList.add("active");
+      }
+
+      // Close modal on overlay click
+      document.getElementById("modal").addEventListener("click", function (e) {
+        if (e.target === this) closeModal();
+      });
+    </script>
+  </body>
+</html>

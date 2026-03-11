@@ -1,0 +1,4048 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BiliBid — Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #070e1a;
+        --surface: #0d1929;
+        --surface2: #112038;
+        --surface3: #172944;
+        --border: rgba(255, 255, 255, 0.07);
+        --blue: #2563eb;
+        --blue-light: #3b82f6;
+        --gold: #f59e0b;
+        --gold-light: #fbbf24;
+        --green: #10b981;
+        --red: #ef4444;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --muted2: #94a3b8;
+        --accent: #1d4ed8;
+        --online: #22c55e;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      .topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: rgba(7, 14, 26, 0.97);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        height: 60px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 12px;
+      }
+      .logo {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 26px;
+        color: var(--text);
+        letter-spacing: 2px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .logo span {
+        color: var(--gold);
+      }
+      .topbar-search {
+        flex: 1;
+        max-width: 380px;
+        margin: 0 10px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 8px 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: relative;
+      }
+      .topbar-search input {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-size: 14px;
+        width: 100%;
+        font-family: "DM Sans", sans-serif;
+      }
+      .topbar-search input::placeholder {
+        color: var(--muted);
+      }
+      .search-results {
+        position: absolute;
+        top: 46px;
+        left: 0;
+        right: 0;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 8px;
+        display: none;
+        z-index: 200;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      }
+      .search-result-item {
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+      }
+      .search-result-item:hover {
+        background: var(--surface3);
+      }
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 16px;
+        position: relative;
+      }
+      .icon-btn:hover {
+        background: var(--surface3);
+        border-color: var(--blue-light);
+      }
+      .badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        background: var(--red);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .avatar-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        border: 2px solid var(--gold);
+        position: relative;
+      }
+      .avatar-btn::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--bg);
+      }
+      .btn-post {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .btn-post:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        padding-top: 60px;
+        min-height: 100vh;
+        width: 100%;
+      }
+      .sidebar-left {
+        position: sticky;
+        top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: 20px 16px;
+        border-right: 1px solid var(--border);
+        background: var(--surface);
+        width: 260px;
+      }
+      .sidebar-left::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-left::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+      .profile-card {
+        background: var(--surface2);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid var(--border);
+        margin-bottom: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .profile-card:hover {
+        border-color: var(--blue-light);
+      }
+      .profile-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        margin: 0 auto 12px;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 800;
+        font-family: "Syne", sans-serif;
+        border: 3px solid var(--gold);
+        position: relative;
+      }
+      .profile-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 14px;
+        height: 14px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--surface2);
+      }
+      .profile-name {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 2px;
+      }
+      .profile-handle {
+        color: var(--muted2);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      .profile-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+      .stat {
+        background: var(--surface3);
+        border-radius: 10px;
+        padding: 8px 4px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .stat:hover {
+        background: rgba(37, 99, 235, 0.2);
+      }
+      .stat-num {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--gold);
+      }
+      .stat-label {
+        font-size: 10px;
+        color: var(--muted2);
+        margin-top: 2px;
+      }
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 20px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted2);
+      }
+      .nav-item:hover,
+      .nav-item.active {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .nav-item.active {
+        color: var(--blue-light);
+      }
+      .nav-icon {
+        font-size: 18px;
+        width: 24px;
+        text-align: center;
+      }
+      .nav-badge {
+        margin-left: auto;
+        background: var(--red);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 2px 7px;
+      }
+      .sidebar-section-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        padding: 0 14px;
+        margin: 16px 0 8px;
+      }
+      .category-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted2);
+        transition: all 0.2s;
+      }
+      .category-item:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .cat-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .page {
+        display: none;
+      }
+      .page.active {
+        display: block;
+      }
+      main {
+        min-width: 0;
+        overflow: hidden;
+      }
+      .ticker-wrap {
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        white-space: nowrap;
+        padding: 10px 0;
+      }
+      .ticker {
+        display: inline-flex;
+        gap: 48px;
+        animation: ticker 30s linear infinite;
+      }
+      @keyframes ticker {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+      .ticker-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .ticker-item span {
+        color: var(--gold);
+        font-weight: 600;
+      }
+      .stories-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .stories-bar::-webkit-scrollbar {
+        height: 0;
+      }
+      .story-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .story-ring {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--gold), var(--blue));
+        padding: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+      }
+      .story-ring:hover {
+        transform: scale(1.08);
+      }
+      .story-ring.live-ring {
+        background: linear-gradient(135deg, var(--red), #ff6b00);
+      }
+      .story-inner {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--surface2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        border: 3px solid var(--bg);
+      }
+      .story-name {
+        font-size: 11px;
+        color: var(--muted2);
+        text-align: center;
+        max-width: 60px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .story-label {
+        font-size: 10px;
+        color: var(--red);
+        font-weight: 700;
+      }
+      .composer {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      .composer-top {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .composer-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        border: 2px solid var(--gold);
+      }
+      .composer-input {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 10px 18px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        color: var(--muted2);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .composer-input:hover {
+        border-color: var(--blue-light);
+        color: var(--text);
+      }
+      .composer-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .composer-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted2);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .composer-btn:hover {
+        background: var(--surface3);
+        color: var(--text);
+        border-color: var(--blue-light);
+      }
+      .filter-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+      }
+      .filter-tabs::-webkit-scrollbar {
+        height: 0;
+      }
+      .filter-tab {
+        padding: 7px 16px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+      }
+      .filter-tab.active {
+        background: var(--blue);
+        color: #fff;
+        border-color: var(--blue);
+      }
+      .filter-tab:hover:not(.active) {
+        border-color: var(--blue-light);
+        color: var(--text);
+      }
+      .auction-post {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        margin-bottom: 20px;
+        overflow: hidden;
+        transition: all 0.3s;
+      }
+      .auction-post:hover {
+        border-color: rgba(37, 99, 235, 0.3);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+      }
+      .post-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 16px 12px;
+      }
+      .post-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        cursor: pointer;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+      }
+      .post-meta {
+        flex: 1;
+      }
+      .post-author {
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .verified {
+        color: var(--blue-light);
+      }
+      .seller-badge {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--gold);
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+      .post-time {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .post-menu-wrap {
+        position: relative;
+      }
+      .post-menu {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--muted);
+        transition: all 0.2s;
+        font-size: 18px;
+      }
+      .post-menu:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .post-menu-dropdown {
+        position: absolute;
+        top: 36px;
+        right: 0;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 6px;
+        z-index: 50;
+        min-width: 160px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        display: none;
+      }
+      .post-menu-dropdown.open {
+        display: block;
+      }
+      .menu-opt {
+        padding: 9px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted2);
+        transition: all 0.2s;
+      }
+      .menu-opt:hover {
+        background: var(--surface3);
+        color: var(--text);
+      }
+      .menu-opt.danger:hover {
+        color: var(--red);
+      }
+      .post-product-img {
+        width: 100%;
+        height: 240px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 80px;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--surface2), var(--surface3));
+      }
+      .post-product-img::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to bottom,
+          transparent 50%,
+          rgba(7, 14, 26, 0.8)
+        );
+      }
+      .img-overlay {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(7, 14, 26, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: pulse 1.5s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+      .post-body {
+        padding: 16px;
+      }
+      .post-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin-bottom: 6px;
+      }
+      .post-desc {
+        font-size: 13px;
+        color: var(--muted2);
+        line-height: 1.6;
+        margin-bottom: 14px;
+      }
+      .post-tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .tag {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        color: var(--muted2);
+      }
+      .bid-section {
+        background: var(--surface2);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+      }
+      .bid-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+      }
+      .bid-label {
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .bid-amount {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--gold-light);
+      }
+      .bid-count {
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .timer {
+        display: flex;
+        gap: 8px;
+      }
+      .time-unit {
+        background: var(--surface3);
+        border-radius: 8px;
+        padding: 6px 10px;
+        text-align: center;
+        border: 1px solid var(--border);
+      }
+      .time-num {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 22px;
+        color: var(--text);
+        line-height: 1;
+      }
+      .time-label {
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .bid-progress {
+        height: 4px;
+        background: var(--surface3);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 10px;
+      }
+      .bid-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--blue), var(--gold));
+        border-radius: 4px;
+      }
+      .bid-input-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .bid-input {
+        flex: 1;
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 14px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .bid-input:focus {
+        border-color: var(--blue-light);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      .bid-btn {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .bid-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+      }
+      .bid-btn.gold-btn {
+        background: linear-gradient(135deg, var(--gold), #ea580c);
+      }
+      .bid-btn.gold-btn:hover {
+        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+      }
+      .post-actions {
+        display: flex;
+        border-top: 1px solid var(--border);
+      }
+      .post-action {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 12px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted2);
+        transition: all 0.2s;
+        border: none;
+        background: none;
+        font-family: "DM Sans", sans-serif;
+      }
+      .post-action:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .post-action.liked {
+        color: var(--red);
+      }
+      .post-action.watching {
+        color: var(--gold);
+      }
+      .bh-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .bh-item:last-child {
+        border-bottom: none;
+      }
+      .bh-av {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .comments-section {
+        border-top: 1px solid var(--border);
+        padding: 14px;
+        display: none;
+      }
+      .comments-section.open {
+        display: block;
+      }
+      .comment-input-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .comment-input {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 9px 16px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .comment-input:focus {
+        border-color: var(--blue-light);
+      }
+      .comment-send {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--blue);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+      }
+      .comment-send:hover {
+        transform: scale(1.1);
+      }
+      .comment-item {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .comment-av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .comment-bubble {
+        background: var(--surface2);
+        border-radius: 14px;
+        padding: 9px 13px;
+        flex: 1;
+        border: 1px solid var(--border);
+      }
+      .comment-author {
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .comment-text {
+        font-size: 13px;
+        color: var(--muted2);
+        line-height: 1.5;
+      }
+      .comment-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 6px;
+      }
+      .comment-action {
+        font-size: 11px;
+        color: var(--muted);
+        cursor: pointer;
+        transition: color 0.2s;
+        background: none;
+        border: none;
+        font-family: "DM Sans", sans-serif;
+      }
+      .comment-action:hover {
+        color: var(--text);
+      }
+      .sidebar-right {
+        position: sticky;
+        top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        padding: 20px 16px;
+        border-left: 1px solid var(--border);
+        background: var(--surface);
+        width: 300px;
+      }
+      .sidebar-right::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-right::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .section-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .section-link {
+        font-size: 12px;
+        color: var(--blue-light);
+        cursor: pointer;
+      }
+      .section-link:hover {
+        text-decoration: underline;
+      }
+      .my-auction-item {
+        background: var(--surface2);
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .my-auction-item:hover {
+        border-color: var(--blue-light);
+      }
+      .auction-thumb {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        background: var(--surface3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .auction-name {
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .auction-price {
+        color: var(--gold);
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .auction-status {
+        font-size: 11px;
+        color: var(--muted2);
+      }
+      .status-live {
+        color: var(--red);
+      }
+      .status-won {
+        color: var(--green);
+      }
+      .notif-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .notif-item:hover {
+        background: var(--surface2);
+      }
+      .notif-item.unread {
+        background: rgba(37, 99, 235, 0.07);
+        border: 1px solid rgba(37, 99, 235, 0.15);
+      }
+      .notif-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--blue);
+        flex-shrink: 0;
+        margin-top: 5px;
+      }
+      .notif-text {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted2);
+      }
+      .notif-text strong {
+        color: var(--text);
+      }
+      .notif-time {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .online-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .online-user:hover {
+        background: var(--surface2);
+      }
+      .online-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .online-avatar::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid var(--surface);
+      }
+      .online-avatar.on::after {
+        background: var(--online);
+      }
+      .online-avatar.off::after {
+        background: var(--muted);
+      }
+      .online-avatar.busy::after {
+        background: var(--gold);
+      }
+      .online-name {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .online-status {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .online-status.on {
+        color: var(--green);
+      }
+      .chat-popup {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        z-index: 200;
+        overflow: hidden;
+        display: none;
+        flex-direction: column;
+      }
+      .chat-popup.open {
+        display: flex;
+      }
+      .chat-header {
+        background: var(--surface2);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .chat-h-av {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        position: relative;
+        flex-shrink: 0;
+      }
+      .chat-h-av::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        background: var(--online);
+        border-radius: 50%;
+        border: 2px solid var(--surface2);
+      }
+      .chat-header-name {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .chat-header-status {
+        font-size: 11px;
+        color: var(--green);
+      }
+      .chat-close {
+        margin-left: auto;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--muted2);
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+      }
+      .chat-close:hover {
+        background: var(--surface3);
+        color: var(--text);
+      }
+      .chat-messages {
+        flex: 1;
+        padding: 14px;
+        height: 280px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .chat-messages::-webkit-scrollbar {
+        width: 4px;
+      }
+      .chat-messages::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+      .msg {
+        max-width: 78%;
+        padding: 10px 13px;
+        border-radius: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .msg.them {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 16px 16px 16px 4px;
+        align-self: flex-start;
+      }
+      .msg.me {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        border-radius: 16px 16px 4px 16px;
+        align-self: flex-end;
+      }
+      .msg-time {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .msg.me .msg-time {
+        text-align: right;
+      }
+      .chat-input-row {
+        padding: 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-top: 1px solid var(--border);
+        background: var(--surface2);
+      }
+      .chat-input {
+        flex: 1;
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 9px 14px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .chat-input:focus {
+        border-color: var(--blue-light);
+      }
+      .chat-send {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+      }
+      .chat-send:hover {
+        transform: scale(1.1);
+      }
+      .chat-bubbles {
+        position: fixed;
+        bottom: 20px;
+        right: 350px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 150;
+      }
+      .chat-bubble {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        transition: all 0.2s;
+        position: relative;
+        border: 3px solid var(--bg);
+      }
+      .chat-bubble:hover {
+        transform: scale(1.1);
+      }
+      .unread-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 16px;
+        height: 16px;
+        background: var(--red);
+        border-radius: 50%;
+        font-size: 9px;
+        color: #fff;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--bg);
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(8px);
+        z-index: 300;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        width: 100%;
+        max-width: 560px;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 28px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      }
+      .modal::-webkit-scrollbar {
+        width: 4px;
+      }
+      .modal::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+      .modal-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        margin-bottom: 6px;
+      }
+      .modal-sub {
+        font-size: 13px;
+        color: var(--muted2);
+        margin-bottom: 24px;
+      }
+      .form-group {
+        margin-bottom: 18px;
+      }
+      .form-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted2);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        display: block;
+      }
+      .form-input,
+      .form-select,
+      .form-textarea {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .form-input:focus,
+      .form-select:focus,
+      .form-textarea:focus {
+        border-color: var(--blue-light);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      .form-select option {
+        background: var(--surface2);
+      }
+      .form-textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .upload-area {
+        background: var(--surface2);
+        border: 2px dashed var(--border);
+        border-radius: 14px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+      }
+      .upload-area:hover {
+        border-color: var(--blue-light);
+        background: var(--surface3);
+      }
+      .upload-area input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+      .upload-icon {
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+      .upload-text {
+        font-size: 13px;
+        color: var(--muted2);
+      }
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+      .btn-cancel {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-cancel:hover {
+        color: var(--text);
+        border-color: var(--text);
+      }
+      .btn-submit {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 50px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+      }
+      .page-header {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 26px;
+        margin-bottom: 6px;
+      }
+      .page-sub {
+        font-size: 14px;
+        color: var(--muted2);
+        margin-bottom: 24px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 14px;
+      }
+      .tab-switcher {
+        display: flex;
+        gap: 0;
+        background: var(--surface2);
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border);
+      }
+      .tab-sw {
+        flex: 1;
+        padding: 8px;
+        text-align: center;
+        border-radius: 9px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted2);
+        transition: all 0.2s;
+      }
+      .tab-sw.active {
+        background: var(--surface3);
+        color: var(--text);
+      }
+      .listing-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .listing-action-btn {
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid var(--border);
+        background: var(--surface3);
+        color: var(--muted2);
+        font-family: "DM Sans", sans-serif;
+      }
+      .listing-action-btn:hover {
+        color: var(--text);
+        border-color: var(--blue-light);
+      }
+      .listing-action-btn.danger:hover {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .wallet-balance {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 42px;
+        color: var(--gold);
+        margin: 10px 0;
+      }
+      .wallet-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .wallet-btn {
+        flex: 1;
+        padding: 12px;
+        border-radius: 12px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+      }
+      .wallet-btn.add {
+        background: linear-gradient(135deg, var(--green), #059669);
+        color: #fff;
+      }
+      .wallet-btn.send {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+      }
+      .wallet-btn.withdraw {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .wallet-btn:hover {
+        transform: translateY(-1px);
+        opacity: 0.9;
+      }
+      .tx-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .tx-item:last-child {
+        border-bottom: none;
+      }
+      .tx-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .tx-name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .tx-date {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .tx-amount {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .tx-amount.credit {
+        color: var(--green);
+      }
+      .tx-amount.debit {
+        color: var(--red);
+      }
+      .won-item {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        transition: all 0.2s;
+      }
+      .won-item:hover {
+        border-color: var(--green);
+      }
+      .watchlist-item {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .watchlist-item:hover {
+        border-color: var(--gold);
+      }
+      .remove-watch {
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: "DM Sans", sans-serif;
+      }
+      .remove-watch:hover {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .confirm-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 500;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .confirm-overlay.open {
+        display: flex;
+      }
+      .confirm-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 28px;
+        max-width: 360px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        text-align: center;
+      }
+      .confirm-icon {
+        font-size: 42px;
+        margin-bottom: 14px;
+      }
+      .confirm-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin-bottom: 8px;
+      }
+      .confirm-msg {
+        font-size: 13px;
+        color: var(--muted2);
+        margin-bottom: 20px;
+        line-height: 1.6;
+      }
+      .confirm-btns {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+      .confirm-ok {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border: none;
+        padding: 10px 28px;
+        border-radius: 50px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .confirm-ok:hover {
+        transform: translateY(-1px);
+      }
+      .confirm-ok.danger {
+        background: linear-gradient(135deg, var(--red), #c2410c);
+      }
+      .confirm-cancel-btn {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .confirm-cancel-btn:hover {
+        color: var(--text);
+      }
+      .toast {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        z-index: 400;
+        opacity: 0;
+        transition: all 0.3s;
+        pointer-events: none;
+        white-space: nowrap;
+        max-width: 90vw;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      .toast.success {
+        border-color: var(--green);
+        color: var(--green);
+      }
+      .toast.error {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .toast.info {
+        border-color: var(--blue-light);
+        color: var(--blue-light);
+      }
+      .toast.gold {
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="logo" onclick="navigate('feed')">Bili<span>Bid</span></div>
+      <div class="topbar-search">
+        <span>🔍</span>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search auctions, sellers, items..."
+          oninput="handleSearch(this.value)"
+          onfocus="showSR()"
+          onblur="setTimeout(hideSR, 200)"
+        />
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <div class="topbar-actions">
+        <div
+          class="icon-btn"
+          onclick="navigate('notifications')"
+          title="Notifications"
+        >
+          🔔
+          <div class="badge" id="notifBadge">3</div>
+        </div>
+        <div
+          class="icon-btn"
+          onclick="openChatByName('MariaSells')"
+          title="Messages"
+        >
+          💬
+          <div class="badge" id="msgBadge">2</div>
+        </div>
+        <div class="icon-btn" onclick="navigate('watchlist')" title="Watchlist">
+          🏷️
+        </div>
+        <button class="btn-post" onclick="openModal()">＋ Post Auction</button>
+        <div
+          class="avatar-btn"
+          onclick="navigate('profile')"
+          title="My Profile"
+        >
+          JN
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="sidebar-left">
+        <div class="profile-card" onclick="navigate('profile')">
+          <div class="profile-avatar">JN</div>
+          <div class="profile-name">Jarme Nathaniel</div>
+          <div class="profile-handle">@jarmenathaniel · ⭐ 4.9</div>
+          <div class="profile-stats">
+            <div
+              class="stat"
+              onclick="
+                event.stopPropagation();
+                navigate('my-auctions');
+              "
+            >
+              <div class="stat-num" id="listedCount">24</div>
+              <div class="stat-label">Listed</div>
+            </div>
+            <div
+              class="stat"
+              onclick="
+                event.stopPropagation();
+                navigate('my-auctions');
+              "
+            >
+              <div class="stat-num">18</div>
+              <div class="stat-label">Sold</div>
+            </div>
+            <div
+              class="stat"
+              onclick="
+                event.stopPropagation();
+                navigate('feed');
+              "
+            >
+              <div class="stat-num">152</div>
+              <div class="stat-label">Bids</div>
+            </div>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="nav-item active" id="nav-feed" onclick="navigate('feed')">
+            <span class="nav-icon">🏠</span>Feed
+          </div>
+          <div
+            class="nav-item"
+            id="nav-my-auctions"
+            onclick="navigate('my-auctions')"
+          >
+            <span class="nav-icon">📦</span>My Auctions<span class="nav-badge"
+              >3</span
+            >
+          </div>
+          <div
+            class="nav-item"
+            id="nav-watchlist"
+            onclick="navigate('watchlist')"
+          >
+            <span class="nav-icon">👁️</span>Watchlist<span
+              class="nav-badge"
+              id="watchBadge"
+              >5</span
+            >
+          </div>
+          <div class="nav-item" id="nav-won" onclick="navigate('won')">
+            <span class="nav-icon">🏆</span>Won Auctions
+          </div>
+          <div
+            class="nav-item"
+            id="nav-notifications"
+            onclick="navigate('notifications')"
+          >
+            <span class="nav-icon">🔔</span>Notifications<span
+              class="nav-badge"
+              id="notifNavBadge"
+              >3</span
+            >
+          </div>
+          <div class="nav-item" id="nav-wallet" onclick="navigate('wallet')">
+            <span class="nav-icon">💰</span>Wallet
+          </div>
+          <div class="nav-item" id="nav-profile" onclick="navigate('profile')">
+            <span class="nav-icon">👤</span>Profile
+          </div>
+        </nav>
+        <div class="sidebar-section-title">Categories</div>
+        <div class="category-item" onclick="filterCat('Electronics')">
+          <span class="cat-dot" style="background: #3b82f6"></span>Electronics
+        </div>
+        <div class="category-item" onclick="filterCat('Fashion')">
+          <span class="cat-dot" style="background: #f59e0b"></span>Fashion &
+          Bags
+        </div>
+        <div class="category-item" onclick="filterCat('Sneakers')">
+          <span class="cat-dot" style="background: #10b981"></span>Sneakers
+        </div>
+        <div class="category-item" onclick="filterCat('Collectibles')">
+          <span class="cat-dot" style="background: #8b5cf6"></span>Collectibles
+        </div>
+        <div class="category-item" onclick="filterCat('Gaming')">
+          <span class="cat-dot" style="background: #ef4444"></span>Gaming
+        </div>
+        <div class="category-item" onclick="filterCat('Cameras')">
+          <span class="cat-dot" style="background: #06b6d4"></span>Cameras
+        </div>
+        <div class="category-item" onclick="filterCat('Watches')">
+          <span class="cat-dot" style="background: #f97316"></span>Watches
+        </div>
+        <div class="category-item" onclick="filterCat('Jewelry')">
+          <span class="cat-dot" style="background: #ec4899"></span>Jewelry
+        </div>
+      </aside>
+
+      <main id="mainArea">
+        <div class="ticker-wrap">
+          <div class="ticker">
+            <div class="ticker-item">
+              🔥 iPhone 15 Pro Max — <span>₱28,500</span>
+            </div>
+            <div class="ticker-item">
+              👟 Jordan 1 Retro — <span>₱4,200</span>
+            </div>
+            <div class="ticker-item">
+              💻 MacBook Air M2 — <span>₱62,000</span>
+            </div>
+            <div class="ticker-item">
+              👜 Vintage LV Bag — <span>₱15,000</span>
+            </div>
+            <div class="ticker-item">
+              🎮 PS5 DualSense — <span>₱2,800</span>
+            </div>
+            <div class="ticker-item">📷 Sony A7 IV — <span>₱45,000</span></div>
+            <div class="ticker-item">
+              ⌚ Casio G-Shock — <span>₱3,100</span>
+            </div>
+            <div class="ticker-item">
+              🔥 iPhone 15 Pro Max — <span>₱28,500</span>
+            </div>
+            <div class="ticker-item">
+              👟 Jordan 1 Retro — <span>₱4,200</span>
+            </div>
+            <div class="ticker-item">
+              💻 MacBook Air M2 — <span>₱62,000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FEED -->
+        <div class="page active" id="page-feed">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="stories-bar">
+              <div class="story-item" onclick="openModal()">
+                <div
+                  class="story-ring"
+                  style="background: var(--surface3); padding: 2px"
+                >
+                  <div
+                    class="story-inner"
+                    style="
+                      background: linear-gradient(
+                        135deg,
+                        var(--blue),
+                        var(--accent)
+                      );
+                      font-size: 28px;
+                    "
+                  >
+                    ＋
+                  </div>
+                </div>
+                <div class="story-name">Go Live</div>
+              </div>
+              <div class="story-item" onclick="openChatByName('MariaSells')">
+                <div class="story-ring live-ring">
+                  <div class="story-inner">👟</div>
+                </div>
+                <div class="story-name">MariaSells</div>
+                <div class="story-label">LIVE</div>
+              </div>
+              <div class="story-item" onclick="openChatByName('TechHub PH')">
+                <div class="story-ring live-ring">
+                  <div class="story-inner">📱</div>
+                </div>
+                <div class="story-name">TechHub</div>
+                <div class="story-label">LIVE</div>
+              </div>
+              <div class="story-item">
+                <div class="story-ring"><div class="story-inner">💻</div></div>
+                <div class="story-name">GadgetPH</div>
+              </div>
+              <div class="story-item">
+                <div class="story-ring"><div class="story-inner">👜</div></div>
+                <div class="story-name">LuxuryMNL</div>
+              </div>
+              <div class="story-item">
+                <div class="story-ring"><div class="story-inner">🎮</div></div>
+                <div class="story-name">GamersHub</div>
+              </div>
+              <div class="story-item">
+                <div class="story-ring"><div class="story-inner">⌚</div></div>
+                <div class="story-name">WatchPH</div>
+              </div>
+            </div>
+            <div class="composer">
+              <div class="composer-top">
+                <div class="composer-avatar">JN</div>
+                <div class="composer-input" onclick="openModal()">
+                  What are you selling today, Jarme?
+                </div>
+              </div>
+              <div class="composer-actions">
+                <div class="composer-btn" onclick="openModal()">
+                  📸 Add Photo
+                </div>
+                <div class="composer-btn" onclick="openModal()">
+                  🏷️ Set Price
+                </div>
+                <div class="composer-btn" onclick="openModal()">
+                  ⏱️ Duration
+                </div>
+                <div class="composer-btn" onclick="openModal()">
+                  🎮 Category
+                </div>
+              </div>
+            </div>
+            <div class="filter-tabs" id="filterTabs">
+              <div class="filter-tab active" onclick="setFilter(this, 'all')">
+                All
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'ending')">
+                Ending Soon
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'Electronics')">
+                Electronics
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'Sneakers')">
+                Sneakers
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'Fashion')">
+                Fashion
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'Gaming')">
+                Gaming
+              </div>
+              <div class="filter-tab" onclick="setFilter(this, 'following')">
+                Following
+              </div>
+            </div>
+            <div id="postsContainer"></div>
+          </div>
+        </div>
+
+        <!-- MY AUCTIONS -->
+        <div class="page" id="page-my-auctions">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">📦 My Auctions</div>
+            <div class="page-sub">Manage your active and past listings</div>
+            <div
+              style="
+                display: flex;
+                justify-content: flex-end;
+                margin-bottom: 16px;
+              "
+            >
+              <button class="btn-submit" onclick="openModal()">
+                ＋ Post New Auction
+              </button>
+            </div>
+            <div class="tab-switcher">
+              <div class="tab-sw active" onclick="myAuctTab(this, 'active')">
+                Active (3)
+              </div>
+              <div class="tab-sw" onclick="myAuctTab(this, 'ended')">
+                Ended (2)
+              </div>
+              <div class="tab-sw" onclick="myAuctTab(this, 'sold')">
+                Sold (18)
+              </div>
+            </div>
+            <div id="myAuctContent"></div>
+          </div>
+        </div>
+
+        <!-- WATCHLIST -->
+        <div class="page" id="page-watchlist">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">👁️ Watchlist</div>
+            <div class="page-sub">
+              Items you're watching — don't miss the winning bid!
+            </div>
+            <div id="watchlistContent"></div>
+          </div>
+        </div>
+
+        <!-- WON AUCTIONS -->
+        <div class="page" id="page-won">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">🏆 Won Auctions</div>
+            <div class="page-sub">Items you've successfully won</div>
+            <div id="wonContent"></div>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="page" id="page-notifications">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 20px;
+              "
+            >
+              <div class="page-header" style="margin-bottom: 0">
+                🔔 Notifications
+              </div>
+              <button
+                class="btn-cancel"
+                style="font-size: 12px; padding: 8px 16px"
+                onclick="markAllRead()"
+              >
+                ✓ Mark all read
+              </button>
+            </div>
+            <div id="notifContent"></div>
+          </div>
+        </div>
+
+        <!-- WALLET -->
+        <div class="page" id="page-wallet">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">💰 Wallet</div>
+            <div class="page-sub">Manage your BiliBid balance</div>
+            <div class="card" style="text-align: center">
+              <div style="font-size: 13px; color: var(--muted2)">
+                Available Balance
+              </div>
+              <div class="wallet-balance" id="walletBal">₱12,500.00</div>
+              <div style="font-size: 12px; color: var(--muted2)">
+                BiliBid Wallet · Updated just now
+              </div>
+              <div class="wallet-actions">
+                <button class="wallet-btn add" onclick="walletAction('add')">
+                  ＋ Add Funds
+                </button>
+                <button class="wallet-btn send" onclick="walletAction('send')">
+                  ↗ Send Money
+                </button>
+                <button
+                  class="wallet-btn withdraw"
+                  onclick="walletAction('withdraw')"
+                >
+                  ↓ Withdraw
+                </button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">📋 Transaction History</div>
+              <div id="txContent"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROFILE -->
+        <div class="page" id="page-profile">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">👤 Profile</div>
+            <div class="page-sub">Manage your account information</div>
+            <div class="card" style="text-align: center">
+              <div
+                style="
+                  width: 90px;
+                  height: 90px;
+                  border-radius: 50%;
+                  background: linear-gradient(135deg, var(--blue), var(--gold));
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 36px;
+                  font-weight: 800;
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  border: 3px solid var(--gold);
+                  margin: 0 auto 16px;
+                "
+              >
+                JN
+              </div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 20px;
+                "
+                id="dispName"
+              >
+                Jarme Nathaniel
+              </div>
+              <div
+                style="
+                  color: var(--muted2);
+                  font-size: 13px;
+                  margin: 4px 0 10px;
+                "
+              >
+                @jarmenathaniel
+              </div>
+              <div
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: rgba(245, 158, 11, 0.15);
+                  border: 1px solid rgba(245, 158, 11, 0.3);
+                  border-radius: 50px;
+                  padding: 4px 14px;
+                  font-size: 12px;
+                  color: var(--gold);
+                  font-weight: 600;
+                "
+              >
+                ⭐ 4.9 Seller Rating · 152 Reviews
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">✏️ Edit Profile</div>
+              <div class="form-group">
+                <label class="form-label">Full Name</label
+                ><input
+                  class="form-input"
+                  id="editName"
+                  value="Jarme Nathaniel"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username</label
+                ><input class="form-input" value="@jarmenathaniel" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label
+                ><input
+                  class="form-input"
+                  value="jarmenathaniel@gmail.com"
+                  type="email"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone</label
+                ><input
+                  class="form-input"
+                  value="+63 912 345 6789"
+                  type="tel"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location</label
+                ><input class="form-input" value="Manila, Philippines" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Bio</label
+                ><textarea class="form-textarea" style="min-height: 70px">
+Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</textarea
+                >
+              </div>
+              <button
+                class="btn-submit"
+                onclick="saveProfile()"
+                style="width: 100%"
+              >
+                💾 Save Changes
+              </button>
+            </div>
+            <div class="card">
+              <div class="card-title">🔒 Security</div>
+              <div class="form-group">
+                <label class="form-label">Current Password</label
+                ><input
+                  class="form-input"
+                  type="password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">New Password</label
+                ><input
+                  class="form-input"
+                  type="password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm Password</label
+                ><input
+                  class="form-input"
+                  type="password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <button
+                class="btn-submit"
+                onclick="savePassword()"
+                style="width: 100%"
+              >
+                🔒 Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="sidebar-right">
+        <div style="margin-bottom: 20px">
+          <div class="section-header">
+            <div class="section-title">🔔 Notifications</div>
+            <div class="section-link" onclick="navigate('notifications')">
+              See all
+            </div>
+          </div>
+          <div id="sidebarNotifs"></div>
+        </div>
+        <div class="section-header">
+          <div class="section-title">📦 My Active Listings</div>
+          <div class="section-link" onclick="navigate('my-auctions')">
+            See all
+          </div>
+        </div>
+        <div class="my-auction-item" onclick="navigate('my-auctions')">
+          <div class="auction-thumb">🎮</div>
+          <div style="flex: 1; min-width: 0">
+            <div class="auction-name">PS5 DualSense Controller</div>
+            <div class="auction-price">₱2,800</div>
+            <div class="auction-status">
+              <span class="status-live">● LIVE</span> · 12 bids · 1d 2h left
+            </div>
+          </div>
+        </div>
+        <div class="my-auction-item" onclick="navigate('my-auctions')">
+          <div class="auction-thumb">📷</div>
+          <div style="flex: 1; min-width: 0">
+            <div class="auction-name">Sony Camera Lens 50mm</div>
+            <div class="auction-price">₱5,500</div>
+            <div class="auction-status">
+              <span class="status-live">● LIVE</span> · 8 bids · 3h left
+            </div>
+          </div>
+        </div>
+        <div class="my-auction-item" onclick="navigate('won')">
+          <div class="auction-thumb">⌚</div>
+          <div style="flex: 1; min-width: 0">
+            <div class="auction-name">Casio G-Shock DW5600</div>
+            <div class="auction-price">₱3,100</div>
+            <div class="auction-status">
+              <span class="status-won">✓ Sold!</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 20px">
+          <div class="section-header">
+            <div class="section-title">💬 Contacts</div>
+            <div class="section-link" onclick="openChatByName('MariaSells')">
+              New chat
+            </div>
+          </div>
+          <div class="online-user" onclick="openChatByName('MariaSells')">
+            <div
+              class="online-avatar on"
+              style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
+            >
+              MS
+            </div>
+            <div>
+              <div class="online-name">MariaSells</div>
+              <div class="online-status on">Active now</div>
+            </div>
+          </div>
+          <div class="online-user" onclick="openChatByName('TechHub PH')">
+            <div
+              class="online-avatar on"
+              style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
+            >
+              TH
+            </div>
+            <div>
+              <div class="online-name">TechHub PH</div>
+              <div class="online-status on">Active now</div>
+            </div>
+          </div>
+          <div class="online-user" onclick="openChatByName('Karl Sneakers')">
+            <div
+              class="online-avatar busy"
+              style="background: linear-gradient(135deg, #10b981, #0891b2)"
+            >
+              KS
+            </div>
+            <div>
+              <div class="online-name">Karl Sneakers</div>
+              <div class="online-status" style="color: var(--gold)">
+                In auction
+              </div>
+            </div>
+          </div>
+          <div class="online-user" onclick="openChatByName('Juan Dela Cruz')">
+            <div
+              class="online-avatar off"
+              style="background: linear-gradient(135deg, #4b5563, #374151)"
+            >
+              JD
+            </div>
+            <div>
+              <div class="online-name">Juan Dela Cruz</div>
+              <div class="online-status">Active 3h ago</div>
+            </div>
+          </div>
+          <div class="online-user" onclick="openChatByName('Ana Navarro')">
+            <div
+              class="online-avatar off"
+              style="background: linear-gradient(135deg, #ec4899, #8b5cf6)"
+            >
+              AN
+            </div>
+            <div>
+              <div class="online-name">Ana Navarro</div>
+              <div class="online-status">Active yesterday</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 20px">
+          <div class="section-header">
+            <div class="section-title">✨ Suggested Sellers</div>
+          </div>
+          <div
+            style="
+              background: var(--surface2);
+              border-radius: 14px;
+              padding: 14px;
+              border: 1px solid var(--border);
+            "
+          >
+            <div
+              style="
+                font-size: 12px;
+                color: var(--gold);
+                font-weight: 700;
+                margin-bottom: 6px;
+              "
+            >
+              🏷️ LuxuryMNL
+            </div>
+            <div style="font-size: 12px; color: var(--muted2)">
+              Designer bags, watches & jewelry. 98% positive feedback.
+            </div>
+            <button
+              class="bid-btn"
+              style="
+                margin-top: 10px;
+                width: 100%;
+                padding: 8px;
+                font-size: 12px;
+              "
+              onclick="toast('✅ Now following LuxuryMNL!', 'success')"
+            >
+              + Follow Seller
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- CHAT POPUP -->
+    <div class="chat-popup" id="chatPopup">
+      <div class="chat-header">
+        <div
+          class="chat-h-av"
+          id="chatAv"
+          style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
+        >
+          MS
+        </div>
+        <div>
+          <div class="chat-header-name" id="chatName">MariaSells</div>
+          <div class="chat-header-status" id="chatStat">Active now</div>
+        </div>
+        <div class="chat-close" onclick="closeChat()">✕</div>
+      </div>
+      <div class="chat-messages" id="chatMsgs"></div>
+      <div class="chat-input-row">
+        <input
+          class="chat-input"
+          id="chatIn"
+          placeholder="Type a message..."
+          onkeydown="if (event.key === 'Enter') sendMsg();"
+        />
+        <button class="chat-send" onclick="sendMsg()">➤</button>
+      </div>
+    </div>
+
+    <div class="chat-bubbles">
+      <div
+        class="chat-bubble"
+        onclick="openChatByName('MariaSells')"
+        style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
+      >
+        MS
+        <div class="unread-dot">2</div>
+      </div>
+      <div
+        class="chat-bubble"
+        onclick="openChatByName('TechHub PH')"
+        style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
+      >
+        TH
+      </div>
+    </div>
+
+    <!-- POST MODAL -->
+    <div
+      class="modal-overlay"
+      id="postModal"
+      onclick="if (event.target === this) closeModal();"
+    >
+      <div class="modal">
+        <div class="modal-title">🏷️ Post New Auction</div>
+        <div class="modal-sub">
+          List your item and let buyers compete for the best price.
+        </div>
+        <div class="upload-area">
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onchange="handleUpload(this)"
+          />
+          <div class="upload-icon" id="upIcon">📸</div>
+          <div class="upload-text" id="upText">
+            Click to upload photos (up to 10 images)<br /><span
+              style="color: var(--muted); font-size: 12px"
+              >JPG, PNG, WebP · Max 10MB each</span
+            >
+          </div>
+        </div>
+        <div style="margin-top: 18px">
+          <div class="form-group">
+            <label class="form-label">Item Title *</label
+            ><input
+              class="form-input"
+              id="pTitle"
+              placeholder="e.g., iPhone 15 Pro Max 256GB"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label
+            ><textarea
+              class="form-textarea"
+              id="pDesc"
+              placeholder="Describe condition, accessories, defects..."
+            ></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category</label
+              ><select class="form-select" id="pCat">
+                <option>Electronics</option>
+                <option>Sneakers</option>
+                <option>Fashion & Bags</option>
+                <option>Gaming</option>
+                <option>Cameras</option>
+                <option>Watches</option>
+                <option>Collectibles</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Condition</label
+              ><select class="form-select" id="pCond">
+                <option>Brand New</option>
+                <option>Like New</option>
+                <option>Pre-loved (Good)</option>
+                <option>Pre-loved (Fair)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Starting Bid (₱) *</label
+              ><input
+                class="form-input"
+                id="pBid"
+                type="number"
+                placeholder="0"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Buy Now Price (₱)</label
+              ><input
+                class="form-input"
+                id="pBuyNow"
+                type="number"
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Auction Duration</label
+            ><select class="form-select" id="pDur">
+              <option>1 hour</option>
+              <option>3 hours</option>
+              <option>6 hours</option>
+              <option>12 hours</option>
+              <option>1 day</option>
+              <option>3 days</option>
+              <option>7 days</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Shipping</label
+            ><select class="form-select" id="pShip">
+              <option>Free Shipping (Metro Manila)</option>
+              <option>Buyer Pays Shipping</option>
+              <option>Meet Up Only</option>
+              <option>Shipping PH-wide</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-submit" onclick="submitPost()">
+            🚀 Post Auction
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WALLET MODAL -->
+    <div
+      class="modal-overlay"
+      id="walletModal"
+      onclick="if (event.target === this) closeWM();"
+    >
+      <div class="modal" style="max-width: 400px">
+        <div class="modal-title" id="wmTitle">Add Funds</div>
+        <div class="modal-sub" id="wmSub">Add money to your BiliBid wallet</div>
+        <div class="form-group">
+          <label class="form-label">Amount (₱)</label
+          ><input
+            class="form-input"
+            id="wmAmt"
+            type="number"
+            placeholder="Enter amount"
+          />
+        </div>
+        <div id="wmExtra"></div>
+        <div class="form-group">
+          <label class="form-label">Payment Method</label
+          ><select class="form-select" id="wmMethod">
+            <option>GCash</option>
+            <option>Maya</option>
+            <option>BDO Bank Transfer</option>
+            <option>BPI Bank Transfer</option>
+            <option>UnionBank</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closeWM()">Cancel</button>
+          <button class="btn-submit" id="wmBtn" onclick="processWallet()">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIRM DIALOG -->
+    <div class="confirm-overlay" id="confirmOverlay">
+      <div class="confirm-box">
+        <div class="confirm-icon" id="cfIcon">❓</div>
+        <div class="confirm-title" id="cfTitle">Are you sure?</div>
+        <div class="confirm-msg" id="cfMsg">This action cannot be undone.</div>
+        <div class="confirm-btns">
+          <button class="confirm-cancel-btn" onclick="closeConfirm()">
+            Cancel
+          </button>
+          <button class="confirm-ok" id="cfOk" onclick="runConfirm()">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // ===== STATE =====
+      let walletBal = 12500;
+      let confirmCb = null;
+      let walletType = "";
+      let feedFilter = "all";
+      let likedPosts = {},
+        watchedPosts = {},
+        postComments = {};
+      let notifs = [
+        {
+          id: 1,
+          read: false,
+          icon: "⚡",
+          text: "<strong>KarlSneakers</strong> outbid you on Jordan 1 Retro! Current: <strong>₱4,200</strong>",
+          time: "2 min ago",
+        },
+        {
+          id: 2,
+          read: false,
+          icon: "⏰",
+          text: "<strong>Your auction</strong> for PS5 Controller ends in <strong>1 hour!</strong>",
+          time: "1 hour ago",
+        },
+        {
+          id: 3,
+          read: false,
+          icon: "🎉",
+          text: "<strong>Ana N.</strong> won your MacBook Pro for <strong>₱72,000</strong> 🎉",
+          time: "Yesterday",
+        },
+        {
+          id: 4,
+          read: true,
+          icon: "💬",
+          text: "<strong>MariaSells</strong> sent you a message about the iPhone",
+          time: "2 hours ago",
+        },
+        {
+          id: 5,
+          read: true,
+          icon: "👍",
+          text: "<strong>TechHub PH</strong> liked your MacBook Air listing",
+          time: "3 hours ago",
+        },
+        {
+          id: 6,
+          read: true,
+          icon: "🏷️",
+          text: "PS5 Controller has received <strong>12 new bids</strong>",
+          time: "Today",
+        },
+      ];
+      let notifCount = 3;
+
+      const txList = [
+        {
+          icon: "🎉",
+          name: "Sold: MacBook Pro 2022",
+          date: "Feb 27",
+          amt: 72000,
+          type: "credit",
+        },
+        {
+          icon: "🏆",
+          name: "Won: Sony WH-1000XM5",
+          date: "Feb 25",
+          amt: -8500,
+          type: "debit",
+        },
+        {
+          icon: "💳",
+          name: "Added Funds via GCash",
+          date: "Feb 24",
+          amt: 5000,
+          type: "credit",
+        },
+        {
+          icon: "🎉",
+          name: "Sold: Canon EOS R50",
+          date: "Feb 20",
+          amt: 35000,
+          type: "credit",
+        },
+        {
+          icon: "↓",
+          name: "Withdrawal to BDO",
+          date: "Feb 18",
+          amt: -20000,
+          type: "debit",
+        },
+      ];
+
+      const chatData = {
+        MariaSells: {
+          init: "MS",
+          bg: "linear-gradient(135deg,#f59e0b,#ea580c)",
+          stat: "Active now",
+          msgs: [
+            {
+              t: "them",
+              tx: "Hi! Is the iPhone still available? 😊",
+              time: "2:34 PM",
+            },
+            {
+              t: "me",
+              tx: "Yes! Auction ends in 2 hours. Bid or Buy Now 🔥",
+              time: "2:36 PM",
+            },
+            {
+              t: "them",
+              tx: "What's the lowest for Buy Now?",
+              time: "2:37 PM",
+            },
+            { t: "me", tx: "Best I can do is ₱31,000!", time: "2:38 PM" },
+          ],
+        },
+        "TechHub PH": {
+          init: "TH",
+          bg: "linear-gradient(135deg,#7c3aed,#2563eb)",
+          stat: "Active now",
+          msgs: [
+            {
+              t: "them",
+              tx: "Are you interested in the MacBook? Let's deal!",
+              time: "1:10 PM",
+            },
+            {
+              t: "me",
+              tx: "What's the lowest bid you'll accept?",
+              time: "1:15 PM",
+            },
+          ],
+        },
+        "Karl Sneakers": {
+          init: "KS",
+          bg: "linear-gradient(135deg,#10b981,#0891b2)",
+          stat: "In auction",
+          msgs: [
+            { t: "them", tx: "Size 10 available pa ba?", time: "11:00 AM" },
+          ],
+        },
+        "Juan Dela Cruz": {
+          init: "JD",
+          bg: "linear-gradient(135deg,#4b5563,#374151)",
+          stat: "Active 3h ago",
+          msgs: [],
+        },
+        "Ana Navarro": {
+          init: "AN",
+          bg: "linear-gradient(135deg,#ec4899,#8b5cf6)",
+          stat: "Active yesterday",
+          msgs: [],
+        },
+      };
+      let currentChat = "MariaSells";
+
+      const myListings = {
+        active: [
+          {
+            e: "🎮",
+            n: "PS5 DualSense Controller",
+            p: "₱2,800",
+            b: 12,
+            t: "1d 2h",
+            c: "Brand New",
+          },
+          {
+            e: "📷",
+            n: "Sony Camera Lens 50mm f/1.8",
+            p: "₱5,500",
+            b: 8,
+            t: "3h 12m",
+            c: "Like New",
+          },
+          {
+            e: "📱",
+            n: "Samsung Galaxy S24 Ultra",
+            p: "₱45,000",
+            b: 3,
+            t: "6h 44m",
+            c: "Brand New",
+          },
+        ],
+        ended: [
+          {
+            e: "💻",
+            n: "Dell XPS 15 Laptop",
+            p: "₱55,000",
+            b: 0,
+            t: "Ended",
+            c: "Pre-loved",
+          },
+          {
+            e: "🎧",
+            n: "Sony WH-1000XM4",
+            p: "₱8,000",
+            b: 1,
+            t: "Ended",
+            c: "Like New",
+          },
+        ],
+        sold: [
+          {
+            e: "⌚",
+            n: "Casio G-Shock DW5600",
+            p: "₱3,100",
+            b: 7,
+            t: "Sold",
+            c: "Pre-loved",
+          },
+          {
+            e: "🖥️",
+            n: "MacBook Pro 2022",
+            p: "₱72,000",
+            b: 15,
+            t: "Sold",
+            c: "Like New",
+          },
+          {
+            e: "📸",
+            n: "Canon EOS R50",
+            p: "₱35,000",
+            b: 9,
+            t: "Sold",
+            c: "Brand New",
+          },
+        ],
+      };
+
+      let watchItems = [
+        {
+          e: "📱",
+          n: "iPhone 15 Pro Max 256GB",
+          p: "₱28,500",
+          seller: "Maria Reyes",
+          time: "2h 9m",
+          bids: 47,
+        },
+        {
+          e: "👟",
+          n: "Nike Air Jordan 1 Retro",
+          p: "₱4,200",
+          seller: "Karl Sneakers",
+          time: "40m",
+          bids: 23,
+        },
+        {
+          e: "💻",
+          n: "MacBook Air M2",
+          p: "₱62,000",
+          seller: "TechHub PH",
+          time: "18h",
+          bids: 31,
+        },
+        {
+          e: "🎮",
+          n: "Nintendo Switch OLED",
+          p: "₱12,500",
+          seller: "GamersHub",
+          time: "1d 5h",
+          bids: 18,
+        },
+        {
+          e: "⌚",
+          n: "Apple Watch Series 9",
+          p: "₱18,000",
+          seller: "GadgetPH",
+          time: "6h",
+          bids: 9,
+        },
+      ];
+
+      let wonItems = [
+        {
+          e: "🎧",
+          n: "Sony WH-1000XM5",
+          p: "₱8,500",
+          date: "Feb 25",
+          seller: "AudioPH",
+          s: "Delivered",
+        },
+        {
+          e: "⌚",
+          n: "Vintage Rolex Submariner",
+          p: "₱15,000",
+          date: "Feb 15",
+          seller: "LuxuryMNL",
+          s: "Processing",
+        },
+        {
+          e: "👟",
+          n: "Yeezy Boost 350 V2",
+          p: "₱6,200",
+          date: "Feb 10",
+          seller: "SneakersPH",
+          s: "Delivered",
+        },
+        {
+          e: "📷",
+          n: "Fujifilm X-T5 Camera",
+          p: "₱52,000",
+          date: "Feb 3",
+          seller: "GadgetPH",
+          s: "Delivered",
+        },
+      ];
+
+      const posts = [
+        {
+          id: "p1",
+          av: "MR",
+          avbg: "linear-gradient(135deg,#7c3aed,#2563eb)",
+          author: "Maria Reyes",
+          verified: true,
+          badge: "⭐ Top Seller",
+          time: "2 hours ago",
+          cat: "Electronics",
+          e: "📱",
+          title: "iPhone 15 Pro Max 256GB — Deep Titanium",
+          desc: "Brand new, sealed in box. Apple PH warranty. Bought as a gift but already have one. Complete with original receipt.",
+          tags: [
+            "📱 iPhone",
+            "✨ Brand New",
+            "📦 Free Shipping",
+            "🇵🇭 Metro Manila",
+          ],
+          bid: 28500,
+          bids: 47,
+          startBid: 20000,
+          buyNow: 32000,
+          secs: 7800,
+          prog: 78,
+          live: true,
+          likes: 84,
+          filter: "Electronics",
+        },
+        {
+          id: "p2",
+          av: "TH",
+          avbg: "linear-gradient(135deg,#f59e0b,#ea580c)",
+          author: "TechHub PH",
+          verified: true,
+          badge: null,
+          time: "5 hours ago",
+          cat: "Computers",
+          e: "💻",
+          title: "MacBook Air M2 — Midnight, 8GB/256GB",
+          desc: "Unit only, complete accessories, international warranty. 2 months old, mint condition. Upgrading to Pro.",
+          tags: ["💻 MacBook", "🍎 Apple M2", "✅ Verified Seller"],
+          bid: 62000,
+          bids: 31,
+          startBid: 50000,
+          buyNow: 70000,
+          secs: 67440,
+          prog: 45,
+          live: false,
+          likes: 112,
+          filter: "Electronics",
+        },
+        {
+          id: "p3",
+          av: "KS",
+          avbg: "linear-gradient(135deg,#10b981,#0891b2)",
+          author: "Karl Sneakers PH",
+          verified: false,
+          badge: null,
+          time: "1 day ago",
+          cat: "Sneakers",
+          e: "👟",
+          title: 'Nike Air Jordan 1 Retro High OG "Chicago"',
+          desc: "Pre-loved, worn once. US10 / EU44. 100% authentic with receipt. Original box included. No box damage.",
+          tags: ["👟 Jordan 1", "🔥 Rare", "📦 With Box", "💯 Legit Check"],
+          bid: 4200,
+          bids: 23,
+          startBid: 2000,
+          buyNow: null,
+          secs: 2402,
+          prog: 92,
+          live: true,
+          likes: 67,
+          filter: "Sneakers",
+        },
+        {
+          id: "p4",
+          av: "GH",
+          avbg: "linear-gradient(135deg,#8b5cf6,#ec4899)",
+          author: "GamersHub PH",
+          verified: true,
+          badge: null,
+          time: "3 hours ago",
+          cat: "Gaming",
+          e: "🎮",
+          title: "Nintendo Switch OLED — White Edition",
+          desc: "Barely used, comes with carrying case and original box. Great condition, no scratches on screen.",
+          tags: ["🎮 Nintendo", "OLED", "📦 With Box", "✨ Like New"],
+          bid: 10000,
+          bids: 18,
+          startBid: 8000,
+          buyNow: 15000,
+          secs: 3900,
+          prog: 60,
+          live: false,
+          likes: 43,
+          filter: "Gaming",
+        },
+      ];
+      let timers = {};
+      posts.forEach((p) => {
+        timers[p.id] = p.secs;
+        postComments[p.id] = [
+          {
+            av: "JD",
+            bg: "linear-gradient(135deg,#4b5563,#374151)",
+            author: "Juan D.",
+            text: "Is this still available?",
+            time: "1h ago",
+          },
+          {
+            av: "AN",
+            bg: "linear-gradient(135deg,#ec4899,#8b5cf6)",
+            author: "Ana N.",
+            text: "What's the lowest?",
+            time: "30m ago",
+          },
+        ];
+      });
+
+      // ===== TIMERS =====
+      function pad(n) {
+        return String(n).padStart(2, "0");
+      }
+      setInterval(() => {
+        posts.forEach((p) => {
+          if (timers[p.id] > 0) timers[p.id]--;
+          const el = document.getElementById("tmr-" + p.id);
+          if (!el) return;
+          const t = timers[p.id],
+            h = Math.floor(t / 3600),
+            m = Math.floor((t % 3600) / 60),
+            s = t % 60;
+          el.innerHTML = `<div class="time-unit"><div class="time-num">${pad(h)}</div><div class="time-label">hrs</div></div><div class="time-unit"><div class="time-num">${pad(m)}</div><div class="time-label">min</div></div><div class="time-unit"><div class="time-num">${pad(s)}</div><div class="time-label">sec</div></div>`;
+        });
+      }, 1000);
+
+      // ===== NAVIGATE =====
+      function navigate(page) {
+        document
+          .querySelectorAll(".page")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".nav-item")
+          .forEach((n) => n.classList.remove("active"));
+        const pg = document.getElementById("page-" + page);
+        if (pg) pg.classList.add("active");
+        const nv = document.getElementById("nav-" + page);
+        if (nv) nv.classList.add("active");
+        if (page === "feed") renderFeed();
+        if (page === "my-auctions") renderMyAuct("active");
+        if (page === "watchlist") renderWatchlist();
+        if (page === "won") renderWon();
+        if (page === "notifications") renderNotifs();
+        if (page === "wallet") renderWallet();
+        window.scrollTo(0, 0);
+      }
+
+      // ===== FEED =====
+      function renderFeed() {
+        let fp = [...posts];
+        if (feedFilter === "ending")
+          fp.sort((a, b) => timers[a.id] - timers[b.id]);
+        else if (feedFilter !== "all" && feedFilter !== "following")
+          fp = posts.filter((p) => p.filter === feedFilter);
+        document.getElementById("postsContainer").innerHTML = fp
+          .map(buildPost)
+          .join("");
+      }
+
+      function buildPost(p) {
+        const bid = p.bid,
+          bids = p.bids,
+          liked = likedPosts[p.id],
+          watched = watchedPosts[p.id];
+        const ending = timers[p.id] < 3600;
+        const cs = postComments[p.id] || [];
+        return `<div class="auction-post" id="${p.id}">
+  <div class="post-header">
+    <div class="post-avatar" style="background:${p.avbg}" onclick="openChatByName('${p.author}')">${p.av}</div>
+    <div class="post-meta">
+      <div class="post-author">${p.author} ${p.verified ? '<span class="verified">✓</span>' : ""} ${p.badge ? `<span class="seller-badge">${p.badge}</span>` : ""}</div>
+      <div class="post-time">${p.time} · ${p.cat}</div>
+    </div>
+    <div class="post-menu-wrap">
+      <div class="post-menu" onclick="toggleMenu('${p.id}')">···</div>
+      <div class="post-menu-dropdown" id="menu-${p.id}">
+        <div class="menu-opt" onclick="closeMenus();openChatByName('${p.author}')">💬 Message Seller</div>
+        <div class="menu-opt" onclick="closeMenus();doWatch('${p.id}')">👁️ ${watched ? "Unwatch" : "Watch Item"}</div>
+        <div class="menu-opt" onclick="closeMenus();doShare()">🔗 Share Listing</div>
+        <div class="menu-opt danger" onclick="closeMenus();toast('✅ Reported','info')">🚩 Report</div>
+      </div>
+    </div>
+  </div>
+  <div class="post-product-img" onclick="doWatch('${p.id}')">${p.e}${p.live ? '<div class="img-overlay"><div class="live-dot"></div> LIVE AUCTION</div>' : ""}</div>
+  <div class="post-body">
+    <div class="post-title">${p.title}</div>
+    <div class="post-desc">${p.desc}</div>
+    <div class="post-tags">${p.tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
+    <div class="bid-section">
+      <div class="bid-row">
+        <div>
+          <div class="bid-label">Current Bid</div>
+          <div class="bid-amount" id="ba-${p.id}">₱${bid.toLocaleString()}</div>
+          <div class="bid-count" id="bc-${p.id}">${bids} bids · ${watched ? "👁️ Watching" : "Not watching"}</div>
+        </div>
+        <div>
+          <div class="bid-label">Time Left</div>
+          <div class="timer" id="tmr-${p.id}">
+            <div class="time-unit"><div class="time-num">${pad(Math.floor(p.secs / 3600))}</div><div class="time-label">hrs</div></div>
+            <div class="time-unit"><div class="time-num">${pad(Math.floor((p.secs % 3600) / 60))}</div><div class="time-label">min</div></div>
+            <div class="time-unit"><div class="time-num">${pad(p.secs % 60)}</div><div class="time-label">sec</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="bid-progress"><div class="bid-progress-fill" style="width:${p.prog}%;${ending ? "background:linear-gradient(90deg,var(--red),var(--gold))" : ""}"></div></div>
+      <div style="font-size:11px;color:${ending ? "var(--red)" : "var(--muted2)"};margin-top:6px;font-weight:${ending ? 700 : 400}">
+        ${ending ? "⚠️ Ending very soon!" : "Starting: ₱" + p.startBid.toLocaleString() + (p.buyNow ? " · Buy Now: ₱" + p.buyNow.toLocaleString() : "")}
+      </div>
+    </div>
+    <div class="bid-input-row" style="margin-top:14px">
+      <input class="bid-input" type="number" id="bi-${p.id}" placeholder="Min ₱${(bid + 100).toLocaleString()}">
+      <button class="bid-btn${ending ? " gold-btn" : ""}" onclick="placeBid('${p.id}')">🔥 ${ending ? "⚡ NOW!" : "Place Bid"}</button>
+    </div>
+    ${p.buyNow ? `<button class="bid-btn gold-btn" style="width:100%;padding:12px" onclick="buyNow('${p.id}',${p.buyNow})">⚡ Buy Now — ₱${p.buyNow.toLocaleString()}</button>` : ""}
+  </div>
+  <div class="post-actions">
+    <button class="post-action${liked ? " liked" : ""}" id="like-${p.id}" onclick="doLike('${p.id}')">❤️ <span id="lc-${p.id}">${p.likes + (liked ? 1 : 0)}</span></button>
+    <button class="post-action" onclick="toggleComments('${p.id}')">💬 <span id="cc-${p.id}">${cs.length}</span> Comments</button>
+    <button class="post-action${watched ? " watching" : ""}" id="wbtn-${p.id}" onclick="doWatch('${p.id}')">👁️ ${watched ? "Watching" : "Watch"}</button>
+    <button class="post-action" onclick="doShare()">↗️ Share</button>
+  </div>
+  <div class="comments-section" id="cmts-${p.id}">
+    <div class="comment-input-row">
+      <div class="composer-avatar" style="width:32px;height:32px;font-size:11px;flex-shrink:0">JN</div>
+      <input class="comment-input" id="cin-${p.id}" placeholder="Write a comment..." onkeydown="if(event.key==='Enter')addComment('${p.id}')">
+      <button class="comment-send" onclick="addComment('${p.id}')">➤</button>
+    </div>
+    <div id="clist-${p.id}">${cs.map((c) => `<div class="comment-item"><div class="comment-av" style="background:${c.bg}">${c.av}</div><div class="comment-bubble"><div class="comment-author">${c.author}</div><div class="comment-text">${c.text}</div><div class="comment-actions"><button class="comment-action" onclick="toast('👍 Liked!','info')">👍 Like</button><button class="comment-action" onclick="toast('💬 Reply...','info')">💬 Reply</button><span style="font-size:11px;color:var(--muted)">${c.time}</span></div></div></div>`).join("")}</div>
+  </div>
+  </div>`;
+      }
+
+      function setFilter(el, f) {
+        document
+          .querySelectorAll(".filter-tab")
+          .forEach((t) => t.classList.remove("active"));
+        el.classList.add("active");
+        feedFilter = f;
+        renderFeed();
+      }
+      function filterCat(cat) {
+        navigate("feed");
+        feedFilter = cat;
+        document
+          .querySelectorAll(".filter-tab")
+          .forEach((t) => t.classList.remove("active"));
+        renderFeed();
+        toast("🔍 " + cat, "info");
+      }
+
+      // ===== BID ACTIONS =====
+      function placeBid(pid) {
+        const el = document.getElementById("bi-" + pid),
+          val = parseInt(el?.value);
+        const post = posts.find((p) => p.id === pid);
+        if (!val || isNaN(val)) {
+          toast("⚠️ Enter a bid amount first!", "error");
+          return;
+        }
+        if (val <= post.bid) {
+          toast(
+            "⚠️ Bid must be higher than ₱" + post.bid.toLocaleString(),
+            "error",
+          );
+          return;
+        }
+        if (walletBal < val) {
+          toast("⚠️ Insufficient wallet balance!", "error");
+          navigate("wallet");
+          return;
+        }
+        showConfirm(
+          "🔥",
+          "Place Bid",
+          `Bid <strong>₱${val.toLocaleString()}</strong> on this item?`,
+          "Place Bid",
+          false,
+          () => {
+            post.bid = val;
+            post.bids++;
+            document.getElementById("ba-" + pid).textContent =
+              "₱" + val.toLocaleString();
+            document.getElementById("bc-" + pid).textContent =
+              post.bids +
+              " bids · " +
+              (watchedPosts[pid] ? "👁️ Watching" : "Not watching");
+            el.value = "";
+            el.placeholder = "Min ₱" + (val + 100).toLocaleString();
+            toast("🔥 Bid of ₱" + val.toLocaleString() + " placed!", "success");
+            addNotif(
+              "🔥",
+              "You placed a bid of ₱" + val.toLocaleString() + "!",
+            );
+          },
+        );
+      }
+
+      function buyNow(pid, price) {
+        if (walletBal < price) {
+          toast("⚠️ Insufficient balance!", "error");
+          navigate("wallet");
+          return;
+        }
+        showConfirm(
+          "⚡",
+          "Buy Now",
+          `Buy for <strong>₱${price.toLocaleString()}</strong>? Deducted from wallet.`,
+          "Buy Now!",
+          false,
+          () => {
+            walletBal -= price;
+            txList.unshift({
+              icon: "🏆",
+              name: "Won via Buy Now",
+              date: "Just now",
+              amt: -price,
+              type: "debit",
+            });
+            wonItems.unshift({
+              e: "🛒",
+              n: "New Purchase",
+              p: "₱" + price.toLocaleString(),
+              date: "Today",
+              seller: "Seller",
+              s: "Processing",
+            });
+            toast(
+              "🎉 Purchased for ₱" + price.toLocaleString() + "!",
+              "success",
+            );
+            addNotif(
+              "🎉",
+              "You bought an item for ₱" + price.toLocaleString() + "!",
+            );
+          },
+        );
+      }
+
+      // ===== LIKE / WATCH / SHARE =====
+      function doLike(pid) {
+        likedPosts[pid] = !likedPosts[pid];
+        const post = posts.find((p) => p.id === pid);
+        document.getElementById("lc-" + pid).textContent =
+          post.likes + (likedPosts[pid] ? 1 : 0);
+        const btn = document.getElementById("like-" + pid);
+        btn.className = "post-action" + (likedPosts[pid] ? " liked" : "");
+        toast(likedPosts[pid] ? "❤️ Liked!" : "💔 Unliked", "info");
+      }
+
+      function doWatch(pid) {
+        watchedPosts[pid] = !watchedPosts[pid];
+        const btn = document.getElementById("wbtn-" + pid);
+        if (btn) {
+          btn.className =
+            "post-action" + (watchedPosts[pid] ? " watching" : "");
+          btn.textContent = "👁️ " + (watchedPosts[pid] ? "Watching" : "Watch");
+        }
+        const bc = document.getElementById("bc-" + pid);
+        const post = posts.find((p) => p.id === pid);
+        if (bc && post)
+          bc.textContent =
+            post.bids +
+            " bids · " +
+            (watchedPosts[pid] ? "👁️ Watching" : "Not watching");
+        toast(
+          watchedPosts[pid]
+            ? "👁️ Added to Watchlist!"
+            : "Removed from Watchlist",
+          "info",
+        );
+      }
+
+      function doShare() {
+        try {
+          navigator.clipboard?.writeText(window.location.href);
+        } catch (e) {}
+        toast("🔗 Link copied!", "success");
+      }
+
+      // ===== COMMENTS =====
+      function toggleComments(pid) {
+        const el = document.getElementById("cmts-" + pid);
+        el.classList.toggle("open");
+        if (el.classList.contains("open"))
+          document.getElementById("cin-" + pid)?.focus();
+      }
+
+      function addComment(pid) {
+        const input = document.getElementById("cin-" + pid),
+          text = input?.value.trim();
+        if (!text) return;
+        if (!postComments[pid]) postComments[pid] = [];
+        postComments[pid].push({
+          av: "JN",
+          bg: "linear-gradient(135deg,var(--blue),var(--gold))",
+          author: "Jarme N.",
+          text,
+          time: "Just now",
+        });
+        const list = document.getElementById("clist-" + pid);
+        list.innerHTML += `<div class="comment-item"><div class="comment-av" style="background:linear-gradient(135deg,var(--blue),var(--gold))">JN</div><div class="comment-bubble"><div class="comment-author">Jarme N.</div><div class="comment-text">${text}</div><div class="comment-actions"><button class="comment-action" onclick="toast('👍','info')">👍 Like</button><button class="comment-action">💬 Reply</button><span style="font-size:11px;color:var(--muted)">Just now</span></div></div></div>`;
+        document.getElementById("cc-" + pid).textContent =
+          postComments[pid].length;
+        input.value = "";
+        toast("💬 Comment posted!", "success");
+      }
+
+      // ===== POST MENU =====
+      function toggleMenu(pid) {
+        closeMenus();
+        document.getElementById("menu-" + pid)?.classList.toggle("open");
+      }
+      function closeMenus() {
+        document
+          .querySelectorAll(".post-menu-dropdown")
+          .forEach((m) => m.classList.remove("open"));
+      }
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".post-menu-wrap")) closeMenus();
+      });
+
+      // ===== MY AUCTIONS =====
+      function renderMyAuct(tab) {
+        const items = myListings[tab] || [];
+        const c = document.getElementById("myAuctContent");
+        if (!items.length) {
+          c.innerHTML =
+            '<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">📦</div><div>No listings here.</div><button class="btn-submit" style="margin-top:16px" onclick="openModal()">＋ Post Auction</button></div>';
+          return;
+        }
+        c.innerHTML = items
+          .map(
+            (
+              item,
+              i,
+            ) => `<div class="card" style="display:flex;gap:14px;align-items:center;padding:14px">
+    <div style="width:56px;height:56px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${item.e}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
+      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
+      <div style="font-size:11px;color:var(--muted2);margin-top:2px">${item.b} bids · ${item.t} · ${item.c}</div>
+      <div class="listing-actions">
+        ${
+          tab === "active"
+            ? `<button class="listing-action-btn" onclick="toast('✏️ Edit listing','info')">✏️ Edit</button>
+        <button class="listing-action-btn" onclick="toast('📊 Viewing bids...','info')">📊 Bids (${item.b})</button>
+        <button class="listing-action-btn" onclick="toast('⚡ Listing promoted!','success')">⚡ Promote</button>
+        <button class="listing-action-btn danger" onclick="showConfirm('🗑️','Delete Listing','Delete this auction? This cannot be undone.','Delete',true,()=>{myListings.active.splice(${i},1);renderMyAuct(\'active\');toast(\'🗑️ Listing deleted\',\'error\')})">🗑️ Delete</button>`
+            : tab === "ended"
+              ? `<button class="listing-action-btn" onclick="openModal()">🔄 Relist</button><button class="listing-action-btn" onclick="toast('📊 View analytics','info')">📊 Analytics</button>`
+              : `<button class="listing-action-btn" onclick="toast('📦 Tracking: In Transit','info')">📦 Track</button><button class="listing-action-btn" onclick="toast('⭐ Review submitted!','success')">⭐ Review</button>`
+        }
+      </div>
+    </div>
+  </div>`,
+          )
+          .join("");
+      }
+
+      function myAuctTab(el, tab) {
+        document
+          .querySelectorAll(".tab-sw")
+          .forEach((t) => t.classList.remove("active"));
+        el.classList.add("active");
+        renderMyAuct(tab);
+      }
+
+      // ===== WATCHLIST =====
+      function renderWatchlist() {
+        const c = document.getElementById("watchlistContent");
+        if (!watchItems.length) {
+          c.innerHTML =
+            '<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">👁️</div><div>No items in watchlist.</div><button class="btn-submit" style="margin-top:16px" onclick="navigate(\'feed\')">Browse Auctions</button></div>';
+          return;
+        }
+        c.innerHTML = watchItems
+          .map(
+            (item, i) => `<div class="watchlist-item">
+    <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${item.e}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
+      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
+      <div style="font-size:11px;color:var(--muted2);margin-top:2px">by ${item.seller} · ${item.bids} bids · ⏰ ${item.time} left</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <input style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;width:120px;outline:none" type="number" placeholder="₱ Your bid" id="wb-${i}">
+        <button class="bid-btn" style="padding:6px 14px;font-size:12px" onclick="wBid(${i})">Bid Now 🔥</button>
+        <button class="remove-watch" onclick="removeWatch(${i})">✕ Remove</button>
+      </div>
+    </div>
+  </div>`,
+          )
+          .join("");
+      }
+
+      function wBid(i) {
+        const v = document.getElementById("wb-" + i)?.value;
+        if (!v) {
+          toast("⚠️ Enter a bid", "error");
+          return;
+        }
+        showConfirm(
+          "🔥",
+          "Place Bid",
+          `Bid <strong>₱${parseInt(v).toLocaleString()}</strong>?`,
+          "Bid!",
+          false,
+          () => {
+            toast("🔥 Bid placed!", "success");
+            document.getElementById("wb-" + i).value = "";
+          },
+        );
+      }
+      function removeWatch(i) {
+        showConfirm(
+          "👁️",
+          "Remove",
+          "Remove this item from watchlist?",
+          "Remove",
+          true,
+          () => {
+            watchItems.splice(i, 1);
+            renderWatchlist();
+            toast("Removed from watchlist", "info");
+            document.getElementById("watchBadge").textContent =
+              watchItems.length;
+          },
+        );
+      }
+
+      // ===== WON AUCTIONS =====
+      function renderWon() {
+        const c = document.getElementById("wonContent");
+        c.innerHTML = wonItems
+          .map(
+            (item) => `<div class="won-item">
+    <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${item.e}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${item.n}</div>
+      <div style="color:var(--gold);font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${item.p}</div>
+      <div style="font-size:11px;color:var(--muted2);margin-top:2px">from ${item.seller} · ${item.date} · <span style="color:${item.s === "Delivered" ? "var(--green)" : "var(--gold)"}">${item.s === "Delivered" ? "✓ Delivered" : "⏳ " + item.s}</span></div>
+    </div>
+    ${item.s === "Delivered" ? `<button class="bid-btn" style="padding:7px 14px;font-size:12px;flex-shrink:0" onclick="toast('⭐ Review submitted!','success')">⭐ Review</button>` : `<button class="bid-btn gold-btn" style="padding:7px 14px;font-size:12px;flex-shrink:0" onclick="toast('📦 Tracking: In Transit','info')">📦 Track</button>`}
+  </div>`,
+          )
+          .join("");
+      }
+
+      // ===== NOTIFICATIONS =====
+      function renderSidebarNotifs() {
+        const c = document.getElementById("sidebarNotifs");
+        c.innerHTML = notifs
+          .slice(0, 3)
+          .map(
+            (n) =>
+              `<div class="notif-item${n.read ? "" : " unread"}" onclick="markRead(${n.id})"><div class="notif-dot" style="background:${n.read ? "var(--muted)" : "var(--blue)"}"></div><div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div></div>`,
+          )
+          .join("");
+      }
+      function renderNotifs() {
+        const c = document.getElementById("notifContent");
+        c.innerHTML = notifs
+          .map(
+            (n) =>
+              `<div class="notif-item${n.read ? "" : " unread"}" onclick="markRead(${n.id})"><div style="font-size:24px;flex-shrink:0;width:40px;text-align:center">${n.icon}</div><div style="flex:1"><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div>${!n.read ? '<div class="notif-dot" style="flex-shrink:0;margin:0"></div>' : ""}</div>`,
+          )
+          .join("");
+      }
+      function markRead(id) {
+        const n = notifs.find((x) => x.id === id);
+        if (n && !n.read) {
+          n.read = true;
+          notifCount = Math.max(0, notifCount - 1);
+          updateNB();
+          renderSidebarNotifs();
+          if (
+            document
+              .getElementById("page-notifications")
+              .classList.contains("active")
+          )
+            renderNotifs();
+        }
+      }
+      function markAllRead() {
+        notifs.forEach((n) => (n.read = true));
+        notifCount = 0;
+        updateNB();
+        renderSidebarNotifs();
+        renderNotifs();
+        toast("✅ All marked read", "success");
+      }
+      function updateNB() {
+        const b1 = document.getElementById("notifBadge"),
+          b2 = document.getElementById("notifNavBadge");
+        if (b1) {
+          b1.textContent = notifCount;
+          b1.style.display = notifCount ? "flex" : "none";
+        }
+        if (b2) {
+          b2.textContent = notifCount;
+          b2.style.display = notifCount ? "" : "none";
+        }
+      }
+      function addNotif(icon, text) {
+        notifs.unshift({
+          id: Date.now(),
+          read: false,
+          icon,
+          text,
+          time: "Just now",
+        });
+        notifCount++;
+        updateNB();
+        renderSidebarNotifs();
+      }
+
+      // ===== WALLET =====
+      function renderWallet() {
+        document.getElementById("walletBal").textContent =
+          "₱" + walletBal.toLocaleString() + ".00";
+        document.getElementById("txContent").innerHTML = txList
+          .map(
+            (t) => `<div class="tx-item">
+    <div class="tx-icon" style="background:${t.type === "credit" ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)"}">${t.icon}</div>
+    <div style="flex:1"><div class="tx-name">${t.name}</div><div class="tx-date">${t.date}</div></div>
+    <div class="tx-amount ${t.type}">${t.type === "credit" ? "+" : ""}₱${Math.abs(t.amt).toLocaleString()}</div>
+  </div>`,
+          )
+          .join("");
+      }
+
+      function walletAction(type) {
+        walletType = type;
+        const titles = {
+          add: "💳 Add Funds",
+          send: "↗️ Send Money",
+          withdraw: "↓ Withdraw",
+        };
+        const subs = {
+          add: "Add money to your BiliBid wallet",
+          send: "Send money to another user",
+          withdraw: "Withdraw to bank or e-wallet",
+        };
+        document.getElementById("wmTitle").textContent = titles[type];
+        document.getElementById("wmSub").textContent = subs[type];
+        document.getElementById("wmBtn").textContent =
+          type === "add" ? "Add Funds" : type === "send" ? "Send" : "Withdraw";
+        document.getElementById("wmExtra").innerHTML =
+          type === "send"
+            ? `<div class="form-group"><label class="form-label">Recipient Username</label><input class="form-input" id="wmRecip" placeholder="@username"></div>`
+            : type === "withdraw"
+              ? `<div class="form-group"><label class="form-label">Account Number</label><input class="form-input" id="wmAcct" placeholder="Account number"></div>`
+              : "";
+        document.getElementById("walletModal").classList.add("open");
+      }
+      function processWallet() {
+        const amt = parseInt(document.getElementById("wmAmt").value);
+        if (!amt || isNaN(amt) || amt <= 0) {
+          toast("⚠️ Enter a valid amount", "error");
+          return;
+        }
+        if (
+          (walletType === "withdraw" || walletType === "send") &&
+          amt > walletBal
+        ) {
+          toast("⚠️ Insufficient balance", "error");
+          return;
+        }
+        closeWM();
+        if (walletType === "add") {
+          walletBal += amt;
+          txList.unshift({
+            icon: "💳",
+            name: "Added via " + document.getElementById("wmMethod").value,
+            date: "Just now",
+            amt,
+            type: "credit",
+          });
+        } else {
+          walletBal -= amt;
+          txList.unshift({
+            icon: walletType === "send" ? "↗️" : "↓",
+            name: walletType === "send" ? "Sent Money" : "Withdrawal",
+            date: "Just now",
+            amt: -amt,
+            type: "debit",
+          });
+        }
+        renderWallet();
+        toast(
+          walletType === "add"
+            ? "✅ ₱" + amt.toLocaleString() + " added!"
+            : walletType === "send"
+              ? "↗️ Sent!"
+              : "↓ Withdrawal requested!",
+          "success",
+        );
+      }
+      function closeWM() {
+        document.getElementById("walletModal").classList.remove("open");
+        document.getElementById("wmAmt").value = "";
+      }
+
+      // ===== PROFILE =====
+      function saveProfile() {
+        document.getElementById("dispName").textContent =
+          document.getElementById("editName").value;
+        toast("✅ Profile saved!", "success");
+      }
+      function savePassword() {
+        toast("🔒 Password updated!", "success");
+      }
+
+      // ===== MODAL =====
+      function openModal() {
+        document.getElementById("postModal").classList.add("open");
+      }
+      function closeModal() {
+        document.getElementById("postModal").classList.remove("open");
+        document.getElementById("pTitle").value = "";
+        document.getElementById("pDesc").value = "";
+        document.getElementById("pBid").value = "";
+        document.getElementById("pBuyNow").value = "";
+        document.getElementById("upIcon").textContent = "📸";
+        document.getElementById("upText").innerHTML =
+          'Click to upload photos (up to 10 images)<br><span style="color:var(--muted);font-size:12px">JPG, PNG, WebP</span>';
+      }
+      function handleUpload(input) {
+        if (input.files.length) {
+          document.getElementById("upIcon").textContent = "✅";
+          document.getElementById("upText").textContent =
+            input.files.length + " photo(s) selected";
+        }
+      }
+      function submitPost() {
+        const title = document.getElementById("pTitle").value.trim();
+        const bid = parseInt(document.getElementById("pBid").value);
+        if (!title) {
+          toast("⚠️ Add a title", "error");
+          return;
+        }
+        if (!bid || isNaN(bid)) {
+          toast("⚠️ Set a starting bid", "error");
+          return;
+        }
+        closeModal();
+        const newPost = {
+          id: "np" + Date.now(),
+          av: "JN",
+          avbg: "linear-gradient(135deg,var(--blue),var(--gold))",
+          author: "Jarme Nathaniel",
+          verified: true,
+          badge: null,
+          time: "Just now",
+          cat: document.getElementById("pCat").value,
+          e: "🏷️",
+          title,
+          desc: document.getElementById("pDesc").value || "No description.",
+          tags: [
+            "✨ " + document.getElementById("pCond").value,
+            "📦 " + document.getElementById("pShip").value.split(" ")[0],
+          ],
+          bid,
+          bids: 0,
+          startBid: bid,
+          buyNow: parseInt(document.getElementById("pBuyNow").value) || null,
+          secs: 3600,
+          prog: 0,
+          live: false,
+          likes: 0,
+          filter: document.getElementById("pCat").value,
+        };
+        posts.unshift(newPost);
+        timers[newPost.id] = 3600;
+        postComments[newPost.id] = [];
+        myListings.active.unshift({
+          e: "🏷️",
+          n: title,
+          p: "₱" + bid.toLocaleString(),
+          b: 0,
+          t: "1h",
+          c: document.getElementById("pCond").value,
+        });
+        const cnt = document.getElementById("listedCount");
+        if (cnt) cnt.textContent = parseInt(cnt.textContent) + 1;
+        navigate("feed");
+        toast("🚀 Auction posted!", "success");
+        addNotif("🚀", 'Your auction "' + title + '" is now live!');
+      }
+
+      // ===== CHAT =====
+      function openChatByName(name) {
+        const data = chatData[name] || {
+          init: name.slice(0, 2).toUpperCase(),
+          bg: "linear-gradient(135deg,#4b5563,#374151)",
+          stat: "Unknown",
+          msgs: [],
+        };
+        currentChat = name;
+        document.getElementById("chatName").textContent = name;
+        document.getElementById("chatStat").textContent = data.stat;
+        const av = document.getElementById("chatAv");
+        av.textContent = data.init;
+        av.style.background = data.bg;
+        const msgsEl = document.getElementById("chatMsgs");
+        msgsEl.innerHTML = data.msgs
+          .map(
+            (m) =>
+              `<div class="msg ${m.t}">${m.tx}<div class="msg-time">${m.time}</div></div>`,
+          )
+          .join("");
+        document.getElementById("chatPopup").classList.add("open");
+        setTimeout(() => {
+          msgsEl.scrollTop = msgsEl.scrollHeight;
+        }, 50);
+      }
+
+      function closeChat() {
+        document.getElementById("chatPopup").classList.remove("open");
+      }
+
+      function sendMsg() {
+        const input = document.getElementById("chatIn");
+        const text = (input?.value || "").trim();
+        if (!text) return;
+        const now = new Date();
+        const time = now.toLocaleTimeString("en-PH", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const msgsEl = document.getElementById("chatMsgs");
+        msgsEl.innerHTML += `<div class="msg me">${escapeHtml(text)}<div class="msg-time">${time}</div></div>`;
+        input.value = "";
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+        if (!chatData[currentChat])
+          chatData[currentChat] = {
+            init: currentChat.slice(0, 2).toUpperCase(),
+            bg: "linear-gradient(135deg,#4b5563,#374151)",
+            stat: "",
+            msgs: [],
+          };
+        chatData[currentChat].msgs.push({ t: "me", tx: text, time });
+        setTimeout(() => {
+          const replies = [
+            "Got it, thanks! 😊",
+            "Sure, I will check that.",
+            "Can you send more photos?",
+            "Sounds good!",
+          ];
+          const r = replies[Math.floor(Math.random() * replies.length)];
+          msgsEl.innerHTML += `<div class="msg them">${r}<div class="msg-time">${time}</div></div>`;
+          msgsEl.scrollTop = msgsEl.scrollHeight;
+          chatData[currentChat].msgs.push({ t: "them", tx: r, time });
+        }, 900);
+      }
+
+      function escapeHtml(str) {
+        return String(str).replace(
+          /[&<>\"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+      }
+
+      // ===== TOAST =====
+      function toast(msg, type) {
+        const t = document.getElementById("toast");
+        t.className = "toast show";
+        if (type) t.classList.add(type);
+        t.innerHTML = msg;
+        setTimeout(() => {
+          t.className = "toast";
+        }, 2500);
+      }
+
+      // ===== CONFIRM DIALOG =====
+      function showConfirm(icon, title, msg, okText, danger, cb) {
+        confirmCb = cb;
+        document.getElementById("cfIcon").textContent = icon;
+        document.getElementById("cfTitle").textContent = title;
+        document.getElementById("cfMsg").innerHTML = msg;
+        const ok = document.getElementById("cfOk");
+        ok.textContent = okText || "Confirm";
+        ok.classList.toggle("danger", !!danger);
+        document.getElementById("confirmOverlay").classList.add("open");
+      }
+      function runConfirm() {
+        if (confirmCb)
+          try {
+            confirmCb();
+          } catch (e) {}
+        closeConfirm();
+      }
+      function closeConfirm() {
+        confirmCb = null;
+        document.getElementById("confirmOverlay").classList.remove("open");
+      }
+
+      // ===== SEARCH HELPERS =====
+      function showSR() {
+        document.getElementById("searchResults").style.display = "block";
+      }
+      function hideSR() {
+        document.getElementById("searchResults").style.display = "none";
+      }
+      function handleSearch(q) {
+        const box = document.getElementById("searchResults");
+        if (!box) return;
+        const v = (q || "").toLowerCase();
+        if (!v) {
+          box.style.display = "none";
+          return;
+        }
+        const matches = posts
+          .filter(
+            (p) =>
+              p.title.toLowerCase().includes(v) ||
+              p.author.toLowerCase().includes(v),
+          )
+          .slice(0, 6);
+        box.innerHTML = matches
+          .map(
+            (m) =>
+              `<div class="search-result-item" onclick="navigate('feed');toast('🔎 Opened ${escapeHtml(m.title)}','info')"><div style="width:36px;height:36px;border-radius:8px;background:${m.avbg};display:flex;align-items:center;justify-content:center">${m.av}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">${escapeHtml(m.title)}</div><div style="font-size:12px;color:var(--muted2)">${escapeHtml(m.author)}</div></div></div>`,
+          )
+          .join("");
+        box.style.display = matches.length ? "block" : "none";
+      }
+
+      // ===== STARTUP =====
+      updateNB();
+      renderSidebarNotifs();
+      renderWallet();
+      renderFeed();
+      // expose some globals for debugging
+      window.navigate = navigate;
+      window.toast = toast;
+    </script>
+  </body>
+</html>
