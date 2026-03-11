@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIG — API Base URL
 // ============================================================
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "https://bilibid-1.onrender.com/api";
 
 // ============================================================
 // DATA — Seed metadata (emoji, category, condition, duration)
