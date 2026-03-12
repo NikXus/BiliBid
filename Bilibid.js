@@ -275,8 +275,9 @@ async function handleLogin() {
 
     showToast(`Welcome back ${data.user.username}!`, "green");
 
+    // ✅ Redirect to BiliBid2.html
     setTimeout(() => {
-      closeAuth();
+      window.location.href = "BiliBid2.html";
     }, 1000);
   } catch (err) {
     msg.style.color = "#ff4757";
