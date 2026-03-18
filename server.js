@@ -13,14 +13,25 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+/* ==============================
+   SOCKET.IO — FIXED CORS + RELAY
+============================== */
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+  transports: ["websocket", "polling"],
+});
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "bilibid_secret_key";
 
 /* ==============================
    MIDDLEWARE
 ============================== */
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
@@ -67,15 +78,17 @@ const authMiddleware = (req, res, next) => {
 /* ==============================
    MONGODB CONNECTION
 ============================== */
+console.log("MONGO_URI:", process.env.MONGO_URI);
 mongoose.set("strictQuery", true);
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    console.log("📌 DB:", mongoose.connection.name);
+  })
   .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err.message);
-    process.exit(1);
   });
-
 /* ==============================
    SCHEMAS
 ============================== */
@@ -85,11 +98,13 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: true, unique: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
-    profilePic: { type: String, default: "" },
+    avatar: { type: String, default: "" },
     bio: { type: String, default: "" },
     location: { type: String, default: "" },
     walletBalance: { type: Number, default: 0 },
     watchlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Auction" }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true },
 );
@@ -99,10 +114,13 @@ const auctionSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, default: "" },
     category: { type: String, default: "Other" },
+    condition: { type: String, default: "" },
+    shipping: { type: String, default: "" },
     location: { type: String, default: "" },
     images: [{ type: String }],
     startingPrice: { type: Number, required: true },
     currentBid: { type: Number, required: true },
+    buyNowPrice: { type: Number, default: null },
     duration: { type: Number, required: true },
     endsAt: { type: Number, required: true },
     sellerId: {
@@ -199,12 +217,123 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+const storySchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    username: { type: String, required: true },
+    text: { type: String, default: "" },
+    imageUrl: { type: String, default: "" },
+    isLive: { type: Boolean, default: false },
+    views: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    expiresAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  },
+  { timestamps: true },
+);
+
+// NEW: Transaction schema
+const transactionSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    type: {
+      type: String,
+      enum: ["credit", "debit"],
+      required: true,
+    },
+    category: {
+      type: String,
+      enum: [
+        "add_funds",
+        "bid_placed",
+        "bid_refund",
+        "bid_won",
+        "sent",
+        "received",
+        "withdrawal",
+        "buy_now",
+      ],
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    description: { type: String, default: "" },
+    relatedUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    relatedAuctionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Auction",
+      default: null,
+    },
+    balanceAfter: { type: Number, required: true },
+    method: { type: String, default: "" },
+  },
+  { timestamps: true },
+);
+
 const User = mongoose.model("User", userSchema);
 const Auction = mongoose.model("Auction", auctionSchema);
 const Message = mongoose.model("Message", messageSchema);
 const Review = mongoose.model("Review", reviewSchema);
 const Notification = mongoose.model("Notification", notificationSchema);
+const Story = mongoose.model("Story", storySchema);
+const Transaction = mongoose.model("Transaction", transactionSchema);
 
+async function createIndexes() {
+  try {
+    // AUCTIONS
+    await Auction.collection.createIndex({ status: 1, createdAt: -1 });
+    await Auction.collection.createIndex({ sellerId: 1 });
+    await Auction.collection.createIndex({
+      title: "text",
+      description: "text",
+    });
+    await Auction.collection.createIndex({ endsAt: 1 });
+
+    // MESSAGES
+    await Message.collection.createIndex({
+      senderId: 1,
+      receiverId: 1,
+      createdAt: 1,
+    });
+    await Message.collection.createIndex({ receiverId: 1, read: 1 });
+
+    // USERS
+    await User.collection.createIndex({ username: 1 });
+
+    // NOTIFICATIONS
+    await Notification.collection.createIndex({
+      userId: 1,
+      read: 1,
+      createdAt: -1,
+    });
+
+    // STORIES (TTL AUTO DELETE)
+    await Story.collection.createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 0 },
+    );
+
+    // TRANSACTIONS
+    await Transaction.collection.createIndex({ userId: 1, createdAt: -1 });
+
+    console.log("✅ Indexes created successfully");
+  } catch (err) {
+    console.error("❌ Index creation error:", err.message);
+  }
+}
 /* ==============================
    ROOT ROUTE
 ============================== */
@@ -213,7 +342,7 @@ app.get("/", (req, res) => {
 });
 
 /* ==============================
-   IMAGE UPLOAD ROUTE
+   IMAGE UPLOAD ROUTES
 ============================== */
 app.post(
   "/api/upload",
@@ -244,6 +373,12 @@ app.post(
 /* REGISTER */
 app.post("/api/register", async (req, res) => {
   try {
+    console.log(
+      "[REGISTER] DB:",
+      mongoose.connection.db.databaseName,
+      "| Host:",
+      mongoose.connection.host,
+    );
     const { username, email, password } = req.body;
     if (!username || !email || !password)
       return res.status(400).json({ message: "All fields required" });
@@ -274,7 +409,7 @@ app.post("/api/register", async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        profilePic: user.profilePic,
+        avatar: user.avatar,
         walletBalance: user.walletBalance,
       },
     });
@@ -312,7 +447,7 @@ app.post("/api/login", async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        profilePic: user.profilePic,
+        avatar: user.avatar,
         bio: user.bio,
         location: user.location,
         walletBalance: user.walletBalance,
@@ -338,34 +473,372 @@ app.get("/api/me", authMiddleware, async (req, res) => {
 /* UPDATE PROFILE */
 app.put("/api/me", authMiddleware, async (req, res) => {
   try {
-    const { bio, location, profilePic } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { bio, location, profilePic },
-      { new: true },
-    ).select("-password");
+    const { bio, location, avatar, username } = req.body;
+    const update = {};
+    if (bio !== undefined) update.bio = bio;
+    if (location !== undefined) update.location = location;
+    if (avatar !== undefined) update.avatar = avatar;
+    if (username !== undefined) update.username = username;
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, {
+      new: true,
+    }).select("-password");
     res.json({ message: "Profile updated", user });
   } catch (err) {
     res.status(500).json({ message: "Failed to update profile" });
   }
 });
 
-/* WALLET: ADD FUNDS */
+/* CHANGE PASSWORD */
+app.put("/api/me/password", authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ message: "Both passwords required" });
+    if (newPassword.length < 6)
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 6 characters" });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match)
+      return res.status(400).json({ message: "Current password is incorrect" });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Password change error:", err);
+    res.status(500).json({ message: "Failed to update password" });
+  }
+});
+
+/* ==============================
+   WALLET ROUTES
+============================== */
+
+/* WALLET: ADD FUNDS — records transaction */
 app.post("/api/wallet/add", authMiddleware, async (req, res) => {
   try {
-    const { amount } = req.body;
-    if (!amount || amount <= 0)
+    const { amount, method } = req.body;
+    if (!amount || Number(amount) <= 0)
       return res.status(400).json({ message: "Invalid amount" });
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: Number(amount) } },
       { new: true },
     ).select("-password");
+
+    await Transaction.create({
+      userId: req.user.id,
+      type: "credit",
+      category: "add_funds",
+      amount: Number(amount),
+      description: `Added via ${method || "GCash"}`,
+      balanceAfter: user.walletBalance,
+      method: method || "GCash",
+    });
+
     res.json({ message: "Funds added", walletBalance: user.walletBalance });
   } catch (err) {
+    console.error("Wallet add error:", err);
     res.status(500).json({ message: "Failed to add funds" });
   }
 });
+
+/* WALLET: SEND MONEY TO ANOTHER USER */
+app.post("/api/wallet/send", authMiddleware, async (req, res) => {
+  try {
+    const { amount, recipientUsername, method } = req.body;
+    if (!amount || Number(amount) <= 0)
+      return res.status(400).json({ message: "Invalid amount" });
+    if (!recipientUsername)
+      return res.status(400).json({ message: "Recipient username required" });
+
+    const sender = await User.findById(req.user.id);
+    if (!sender) return res.status(404).json({ message: "Sender not found" });
+
+    const recipient = await User.findOne({
+      username: { $regex: `^${recipientUsername}$`, $options: "i" },
+    });
+    if (!recipient)
+      return res
+        .status(404)
+        .json({ message: `User @${recipientUsername} not found` });
+    if (recipient._id.toString() === req.user.id)
+      return res.status(400).json({ message: "Cannot send money to yourself" });
+
+    const sendAmt = Number(amount);
+    if (sender.walletBalance < sendAmt)
+      return res.status(400).json({ message: "Insufficient wallet balance" });
+
+    const updatedSender = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { walletBalance: -sendAmt } },
+      { new: true },
+    );
+
+    const updatedRecipient = await User.findByIdAndUpdate(
+      recipient._id,
+      { $inc: { walletBalance: sendAmt } },
+      { new: true },
+    );
+
+    await Transaction.create({
+      userId: req.user.id,
+      type: "debit",
+      category: "sent",
+      amount: sendAmt,
+      description: `Sent to @${recipient.username}`,
+      relatedUserId: recipient._id,
+      balanceAfter: updatedSender.walletBalance,
+      method: method || "BiliBid Wallet",
+    });
+
+    await Transaction.create({
+      userId: recipient._id,
+      type: "credit",
+      category: "received",
+      amount: sendAmt,
+      description: `Received from @${req.user.username}`,
+      relatedUserId: req.user.id,
+      balanceAfter: updatedRecipient.walletBalance,
+      method: "BiliBid Wallet",
+    });
+
+    await Notification.create({
+      userId: recipient._id,
+      type: "message",
+      message: `💸 @${req.user.username} sent you ₱${sendAmt.toLocaleString()}!`,
+      link: "",
+    });
+
+    res.json({
+      message: `✅ ₱${sendAmt.toLocaleString()} sent to @${recipient.username}`,
+      walletBalance: updatedSender.walletBalance,
+    });
+  } catch (err) {
+    console.error("Wallet send error:", err);
+    res.status(500).json({ message: "Failed to send money" });
+  }
+});
+
+/* WALLET: WITHDRAW */
+app.post("/api/wallet/withdraw", authMiddleware, async (req, res) => {
+  try {
+    const { amount, method, accountNumber, accountName } = req.body;
+    if (!amount || Number(amount) <= 0)
+      return res.status(400).json({ message: "Invalid amount" });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const withdrawAmt = Number(amount);
+    if (user.walletBalance < withdrawAmt)
+      return res.status(400).json({ message: "Insufficient wallet balance" });
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { walletBalance: -withdrawAmt } },
+      { new: true },
+    );
+
+    await Transaction.create({
+      userId: req.user.id,
+      type: "debit",
+      category: "withdrawal",
+      amount: withdrawAmt,
+      description: `Withdrawal to ${method || "GCash"}${accountNumber ? ` (${accountNumber})` : ""}`,
+      balanceAfter: updatedUser.walletBalance,
+      method: method || "GCash",
+    });
+
+    res.json({
+      message: `✅ ₱${withdrawAmt.toLocaleString()} withdrawal requested`,
+      walletBalance: updatedUser.walletBalance,
+    });
+  } catch (err) {
+    console.error("Wallet withdraw error:", err);
+    res.status(500).json({ message: "Failed to process withdrawal" });
+  }
+});
+
+/* WALLET: GET TRANSACTION HISTORY */
+app.get("/api/wallet/transactions", authMiddleware, async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate("relatedUserId", "username avatar")
+      .populate("relatedAuctionId", "title");
+
+    res.json(transactions);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch transactions" });
+  }
+});
+
+/* ==============================
+   USER ROUTES
+============================== */
+
+/* GET /api/users?search=q — used by live search */
+app.get("/api/users", async (req, res) => {
+  try {
+    const { search } = req.query;
+    const filter = search
+      ? { username: { $regex: search, $options: "i" } }
+      : {};
+    const users = await User.find(filter).select("-password -email").limit(10);
+
+    const myId = req.headers.authorization
+      ? (() => {
+          try {
+            return jwt.verify(
+              req.headers.authorization.split(" ")[1],
+              JWT_SECRET,
+            ).id;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    const result = users.map((u) => ({
+      _id: u._id,
+      username: u.username,
+      avatar: u.avatar,
+      bio: u.bio,
+      followersCount: u.followers?.length || 0,
+      followingCount: u.following?.length || 0,
+      isFollowing: myId
+        ? u.followers.some((f) => f.toString() === myId)
+        : false,
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+/* GET /api/users/:id — used by openUserProfile() */
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password -email");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const myId = req.headers.authorization
+      ? (() => {
+          try {
+            return jwt.verify(
+              req.headers.authorization.split(" ")[1],
+              JWT_SECRET,
+            ).id;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    const listingsCount = await Auction.countDocuments({ sellerId: user._id });
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      avatar: user.avatar,
+      bio: user.bio,
+      location: user.location,
+      followersCount: user.followers?.length || 0,
+      followingCount: user.following?.length || 0,
+      listingsCount,
+      isFollowing: myId
+        ? user.followers.some((f) => f.toString() === myId)
+        : false,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+});
+
+/* POST /api/users/:id/follow */
+app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    if (targetId === req.user.id)
+      return res.status(400).json({ message: "Cannot follow yourself" });
+
+    const target = await User.findById(targetId);
+    if (!target) return res.status(404).json({ message: "User not found" });
+
+    const alreadyFollowing = target.followers.some(
+      (f) => f.toString() === req.user.id,
+    );
+
+    if (alreadyFollowing) {
+      await User.findByIdAndUpdate(targetId, {
+        $pull: { followers: req.user.id },
+      });
+      await User.findByIdAndUpdate(req.user.id, {
+        $pull: { following: targetId },
+      });
+      res.json({ following: false });
+    } else {
+      await User.findByIdAndUpdate(targetId, {
+        $addToSet: { followers: req.user.id },
+      });
+      await User.findByIdAndUpdate(req.user.id, {
+        $addToSet: { following: targetId },
+      });
+      await Notification.create({
+        userId: targetId,
+        type: "follow",
+        message: `👥 ${req.user.username} started following you!`,
+      });
+      res.json({ following: true });
+    }
+  } catch (err) {
+    res.status(500).json({ message: "Follow action failed" });
+  }
+});
+
+/* DELETE /api/users/:id/follow */
+app.delete("/api/users/:id/follow", authMiddleware, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    await User.findByIdAndUpdate(targetId, {
+      $pull: { followers: req.user.id },
+    });
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { following: targetId },
+    });
+    res.json({ following: false });
+  } catch (err) {
+    res.status(500).json({ message: "Unfollow failed" });
+  }
+});
+
+/* POST /api/users/upload-avatar */
+app.post(
+  "/api/users/upload-avatar",
+  authMiddleware,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ message: "No file uploaded" });
+      const avatarUrl = `/uploads/${req.file.filename}`;
+      await User.findByIdAndUpdate(req.user.id, { avatar: avatarUrl });
+      res.json({ avatarUrl });
+    } catch (err) {
+      res.status(500).json({ message: "Avatar upload failed" });
+    }
+  },
+);
 
 /* ==============================
    AUCTION ROUTES
@@ -374,13 +847,14 @@ app.post("/api/wallet/add", authMiddleware, async (req, res) => {
 /* GET ALL AUCTIONS (with filters) */
 app.get("/api/auctions", async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, location, status } =
+    const { category, search, minPrice, maxPrice, location, status, sellerId } =
       req.query;
     const filter = {};
     if (category && category !== "All") filter.category = category;
     if (search) filter.title = { $regex: search, $options: "i" };
     if (location) filter.location = { $regex: location, $options: "i" };
     if (status) filter.status = status;
+    if (sellerId) filter.sellerId = sellerId;
     if (minPrice || maxPrice) {
       filter.currentBid = {};
       if (minPrice) filter.currentBid.$gte = Number(minPrice);
@@ -398,7 +872,6 @@ app.get("/api/auctions", async (req, res) => {
           const winner = auction.bids[auction.bids.length - 1];
           auction.winnerId = winner.bidderId;
           auction.winnerName = winner.bidderName;
-          // Notify winner
           await Notification.create({
             userId: winner.bidderId,
             type: "won",
@@ -440,7 +913,7 @@ app.get("/api/auctions/user/won", authMiddleware, async (req, res) => {
   }
 });
 
-/* GET SINGLE AUCTION — keep /:id AFTER all /user/* routes */
+/* GET SINGLE AUCTION */
 app.get("/api/auctions/:id", async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -458,10 +931,13 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       title,
       description,
       category,
+      condition,
+      shipping,
       location,
       images,
       startingPrice,
       duration,
+      buyNowPrice,
     } = req.body;
     if (!title || !startingPrice || !duration)
       return res.status(400).json({ message: "Missing required fields" });
@@ -470,10 +946,13 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       title,
       description: description || "",
       category: category || "Other",
+      condition: condition || "",
+      shipping: shipping || "",
       location: location || "",
       images: images || [],
       startingPrice: Number(startingPrice),
       currentBid: Number(startingPrice),
+      buyNowPrice: buyNowPrice ? Number(buyNowPrice) : null,
       duration: Number(duration),
       endsAt: Date.now() + Number(duration) * 1000,
       sellerId: req.user.id,
@@ -481,7 +960,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       bids: [],
     });
 
-    // Notify seller
     await Notification.create({
       userId: req.user.id,
       type: "created",
@@ -496,7 +974,7 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
   }
 });
 
-/* PLACE BID */
+/* PLACE BID — with transaction recording */
 app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
   try {
     const { bidAmount } = req.body;
@@ -511,11 +989,10 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
 
     const amount = Number(bidAmount);
     if (amount <= auction.currentBid)
-      return res
-        .status(400)
-        .json({ message: `Bid must be higher than ₱${auction.currentBid}` });
+      return res.status(400).json({
+        message: `Bid must be higher than ₱${auction.currentBid}`,
+      });
 
-    // Deduct from bidder wallet
     const bidder = await User.findById(req.user.id);
     if (!bidder) return res.status(404).json({ message: "User not found" });
     if (bidder.walletBalance < amount)
@@ -524,13 +1001,43 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
     // Refund previous highest bidder
     if (auction.bids.length > 0) {
       const lastBid = auction.bids[auction.bids.length - 1];
-      await User.findByIdAndUpdate(lastBid.bidderId, {
-        $inc: { walletBalance: lastBid.bidAmount },
+      const refundedUser = await User.findByIdAndUpdate(
+        lastBid.bidderId,
+        { $inc: { walletBalance: lastBid.bidAmount } },
+        { new: true },
+      );
+      await Transaction.create({
+        userId: lastBid.bidderId,
+        type: "credit",
+        category: "bid_refund",
+        amount: lastBid.bidAmount,
+        description: `Outbid refund — "${auction.title}"`,
+        relatedAuctionId: auction._id,
+        balanceAfter: refundedUser.walletBalance,
+      });
+      await Notification.create({
+        userId: lastBid.bidderId,
+        type: "outbid",
+        message: `⚠️ You were outbid on "${auction.title}". New bid: ₱${amount}`,
       });
     }
 
-    await User.findByIdAndUpdate(req.user.id, {
-      $inc: { walletBalance: -amount },
+    // Deduct from bidder
+    const updatedBidder = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { walletBalance: -amount } },
+      { new: true },
+    );
+
+    // Record bid transaction
+    await Transaction.create({
+      userId: req.user.id,
+      type: "debit",
+      category: "bid_placed",
+      amount,
+      description: `Bid on "${auction.title}"`,
+      relatedAuctionId: auction._id,
+      balanceAfter: updatedBidder.walletBalance,
     });
 
     auction.currentBid = amount;
@@ -542,22 +1049,73 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
     });
     await auction.save();
 
-    // Notify seller of new bid
     await Notification.create({
       userId: auction.sellerId,
       type: "bid",
-      message: `💰 ${req.user.username} placed a bid of ₱${amount} on your auction "${auction.title}"`,
+      message: `💰 ${req.user.username} placed a bid of ₱${amount} on "${auction.title}"`,
     });
 
     io.emit("bidPlaced", {
       auctionId: auction._id,
       currentBid: amount,
       bidderName: req.user.username,
+      bids: auction.bids.length,
     });
+
     res.json({ message: "Bid placed", auction });
   } catch (err) {
     console.error("Bid error:", err);
     res.status(500).json({ message: "Failed to place bid" });
+  }
+});
+
+/* BUY NOW */
+app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
+  try {
+    const auction = await Auction.findById(req.params.id);
+    if (!auction) return res.status(404).json({ message: "Auction not found" });
+    if (auction.status === "ended")
+      return res.status(400).json({ message: "Auction has ended" });
+    if (!auction.buyNowPrice)
+      return res.status(400).json({ message: "No Buy Now price set" });
+    if (auction.sellerId.toString() === req.user.id)
+      return res.status(400).json({ message: "Cannot buy your own auction" });
+
+    const buyer = await User.findById(req.user.id);
+    if (buyer.walletBalance < auction.buyNowPrice)
+      return res.status(400).json({ message: "Insufficient wallet balance" });
+
+    const updatedBuyer = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { walletBalance: -auction.buyNowPrice } },
+      { new: true },
+    );
+
+    await Transaction.create({
+      userId: req.user.id,
+      type: "debit",
+      category: "buy_now",
+      amount: auction.buyNowPrice,
+      description: `Bought "${auction.title}"`,
+      relatedAuctionId: auction._id,
+      balanceAfter: updatedBuyer.walletBalance,
+    });
+
+    auction.status = "ended";
+    auction.winnerId = req.user.id;
+    auction.winnerName = req.user.username;
+    auction.currentBid = auction.buyNowPrice;
+    await auction.save();
+
+    await Notification.create({
+      userId: auction.sellerId,
+      type: "won",
+      message: `🎉 ${req.user.username} bought "${auction.title}" for ₱${auction.buyNowPrice}!`,
+    });
+
+    res.json({ message: "Purchase successful", auction });
+  } catch (err) {
+    res.status(500).json({ message: "Buy Now failed" });
   }
 });
 
@@ -603,7 +1161,7 @@ app.post("/api/auctions/:id/comment", authMiddleware, async (req, res) => {
   }
 });
 
-/* WATCHLIST */
+/* WATCHLIST TOGGLE */
 app.post("/api/auctions/:id/watch", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -640,7 +1198,7 @@ app.get("/api/auctions/:id/bids", async (req, res) => {
     );
     if (!auction) return res.status(404).json({ message: "Auction not found" });
     res.json({
-      bids: auction.bids.reverse(),
+      bids: [...auction.bids].reverse(),
       title: auction.title,
       currentBid: auction.currentBid,
     });
@@ -649,14 +1207,13 @@ app.get("/api/auctions/:id/bids", async (req, res) => {
   }
 });
 
-/* DELETE AUCTION (seller only) */
+/* DELETE AUCTION */
 app.delete("/api/auctions/:id", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
     if (!auction) return res.status(404).json({ message: "Auction not found" });
     if (auction.sellerId.toString() !== req.user.id)
       return res.status(403).json({ message: "Not authorized" });
-
     await auction.deleteOne();
     res.json({ message: "Auction deleted" });
   } catch (err) {
@@ -664,7 +1221,7 @@ app.delete("/api/auctions/:id", authMiddleware, async (req, res) => {
   }
 });
 
-/* EDIT AUCTION (seller only) */
+/* EDIT AUCTION */
 app.put("/api/auctions/:id", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -692,47 +1249,60 @@ app.put("/api/auctions/:id", authMiddleware, async (req, res) => {
    MESSAGING ROUTES
 ============================== */
 
-/* GET CONVERSATIONS */
-app.get("/api/messages/conversations", authMiddleware, async (req, res) => {
+const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
     const messages = await Message.find({
       $or: [{ senderId: userId }, { receiverId: userId }],
     })
       .sort({ createdAt: -1 })
-      .populate("senderId", "username profilePic")
-      .populate("receiverId", "username profilePic");
+      .populate("senderId", "username avatar")
+      .populate("receiverId", "username avatar");
 
-    // Group by conversation partner
     const convMap = {};
     for (const msg of messages) {
-      const partner =
-        msg.senderId._id.toString() === userId ? msg.receiverId : msg.senderId;
-      const key = partner._id.toString();
+      const senderIdStr = msg.senderId._id
+        ? msg.senderId._id.toString()
+        : msg.senderId.toString();
+      const receiverIdStr = msg.receiverId._id
+        ? msg.receiverId._id.toString()
+        : msg.receiverId.toString();
+
+      const partner = senderIdStr === userId ? msg.receiverId : msg.senderId;
+      const key = partner._id ? partner._id.toString() : partner.toString();
+
       if (!convMap[key]) {
         convMap[key] = {
-          partnerId: partner._id,
-          partnerName: partner.username,
-          partnerPic: partner.profilePic,
+          userId: partner._id || partner,
+          partnerId: partner._id || partner,
+          partnerName: partner.username || "User",
+          username: partner.username || "User",
+          avatar: partner.avatar || "",
+          partnerPic: partner.avatar || "",
           lastMessage:
             msg.message ||
             (msg.messageType === "image" ? "📷 Image" : "📍 Location"),
+          lastMsgTime: msg.createdAt,
           lastTime: msg.createdAt,
           unread: 0,
         };
       }
-      if (!msg.read && msg.receiverId._id.toString() === userId) {
+      if (!msg.read && receiverIdStr === userId) {
         convMap[key].unread++;
       }
     }
 
     res.json(Object.values(convMap));
   } catch (err) {
+    console.error("Conversations error:", err);
     res.status(500).json({ message: "Failed to fetch conversations" });
   }
-});
+};
 
-/* GET MESSAGES WITH USER */
+app.get("/api/messages", authMiddleware, getConversations);
+app.get("/api/messages/conversations", authMiddleware, getConversations);
+
+/* GET MESSAGES WITH A SPECIFIC USER */
 app.get("/api/messages/:userId", authMiddleware, async (req, res) => {
   try {
     const myId = req.user.id;
@@ -744,7 +1314,6 @@ app.get("/api/messages/:userId", authMiddleware, async (req, res) => {
       ],
     }).sort({ createdAt: 1 });
 
-    // Mark as read
     await Message.updateMany(
       { senderId: theirId, receiverId: myId, read: false },
       { read: true },
@@ -756,7 +1325,7 @@ app.get("/api/messages/:userId", authMiddleware, async (req, res) => {
   }
 });
 
-/* SEND MESSAGE */
+/* SEND MESSAGE (REST fallback) */
 app.post("/api/messages", authMiddleware, async (req, res) => {
   try {
     const { receiverId, message, messageType, imageUrl, location } = req.body;
@@ -772,17 +1341,22 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
       location: location || null,
     });
 
-    // Notify receiver
     await Notification.create({
       userId: receiverId,
       type: "message",
       message: `💬 ${req.user.username} sent you a message`,
+      link: `chat:${req.user.id}`,
     });
 
-    io.to(receiverId).emit("newMessage", {
-      ...msg.toObject(),
-      senderName: req.user.username,
-    });
+    const receiverSocketId = onlineUsers[receiverId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", {
+        ...msg.toObject(),
+        senderName: req.user.username,
+        senderId: req.user.id,
+      });
+    }
+
     res.status(201).json(msg);
   } catch (err) {
     res.status(500).json({ message: "Failed to send message" });
@@ -808,10 +1382,14 @@ app.post(
         imageUrl,
       });
 
-      io.to(receiverId).emit("newMessage", {
-        ...msg.toObject(),
-        senderName: req.user.username,
-      });
+      const receiverSocketId = onlineUsers[receiverId];
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", {
+          ...msg.toObject(),
+          senderName: req.user.username,
+          senderId: req.user.id,
+        });
+      }
       res.status(201).json(msg);
     } catch (err) {
       res.status(500).json({ message: "Failed to send image message" });
@@ -823,10 +1401,11 @@ app.post(
    REVIEW ROUTES
 ============================== */
 
-/* POST REVIEW */
-app.post("/api/reviews", authMiddleware, async (req, res) => {
+const submitReview = async (req, res) => {
   try {
-    const { targetUserId, rating, comment, auctionId } = req.body;
+    const targetUserId = req.params.userId || req.body.targetUserId;
+    const { rating, comment, auctionId } = req.body;
+
     if (!targetUserId || !rating || !comment)
       return res.status(400).json({ message: "All fields required" });
     if (targetUserId === req.user.id)
@@ -861,14 +1440,17 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Failed to submit review" });
   }
-});
+};
+
+app.post("/api/reviews", authMiddleware, submitReview);
+app.post("/api/reviews/:userId", authMiddleware, submitReview);
 
 /* GET REVIEWS FOR USER */
 app.get("/api/reviews/:userId", async (req, res) => {
   try {
-    const reviews = await Review.find({ targetUserId: req.params.userId }).sort(
-      { createdAt: -1 },
-    );
+    const reviews = await Review.find({
+      targetUserId: req.params.userId,
+    }).sort({ createdAt: -1 });
     const avg = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : 0;
@@ -893,12 +1475,71 @@ app.get("/api/notifications", authMiddleware, async (req, res) => {
   }
 });
 
+app.put("/api/notifications/:id/read", authMiddleware, async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { read: true },
+    );
+    res.json({ message: "Notification marked as read" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to mark notification" });
+  }
+});
+
 app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   try {
     await Notification.updateMany({ userId: req.user.id }, { read: true });
     res.json({ message: "All notifications marked as read" });
   } catch (err) {
     res.status(500).json({ message: "Failed to mark notifications" });
+  }
+});
+
+/* ==============================
+   STORY ROUTES
+============================== */
+
+app.get("/api/stories", async (req, res) => {
+  try {
+    const stories = await Story.find({
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ createdAt: -1 })
+      .limit(30);
+    res.json(stories);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch stories" });
+  }
+});
+
+app.post("/api/stories", authMiddleware, async (req, res) => {
+  try {
+    const { text, imageUrl } = req.body;
+    if (!text && !imageUrl)
+      return res.status(400).json({ message: "Add text or an image" });
+
+    const story = await Story.create({
+      userId: req.user.id,
+      username: req.user.username,
+      text: text || "",
+      imageUrl: imageUrl || "",
+      isLive: false,
+    });
+    res.status(201).json(story);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to post story" });
+  }
+});
+
+app.post("/api/stories/:id/view", authMiddleware, async (req, res) => {
+  try {
+    await Story.findByIdAndUpdate(req.params.id, {
+      $addToSet: { views: req.user.id },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to record view" });
   }
 });
 
@@ -918,7 +1559,7 @@ app.get("/api/analytics", authMiddleware, async (req, res) => {
     const totalRevenue = myAuctions
       .filter((a) => a.status === "ended" && a.bids.length > 0)
       .reduce((s, a) => s + a.currentBid, 0);
-    const totalViews = myAuctions.reduce((s, a) => s + a.likes.length, 0);
+    const totalLikes = myAuctions.reduce((s, a) => s + a.likes.length, 0);
 
     res.json({
       totalListings,
@@ -926,35 +1567,11 @@ app.get("/api/analytics", authMiddleware, async (req, res) => {
       endedListings,
       totalBidsReceived,
       totalRevenue,
-      totalLikes: totalViews,
+      totalLikes,
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch analytics" });
   }
-});
-
-/* ==============================
-   SOCKET.IO REAL-TIME MESSAGING
-============================== */
-const onlineUsers = {};
-
-io.on("connection", (socket) => {
-  console.log("🔌 Socket connected:", socket.id);
-
-  socket.on("join", (userId) => {
-    onlineUsers[userId] = socket.id;
-    socket.join(userId);
-    console.log(`👤 User ${userId} joined`);
-  });
-
-  socket.on("disconnect", () => {
-    for (const [userId, sid] of Object.entries(onlineUsers)) {
-      if (sid === socket.id) {
-        delete onlineUsers[userId];
-        break;
-      }
-    }
-  });
 });
 
 /* ==============================
@@ -967,6 +1584,83 @@ app.delete("/api/auctions/reset", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Failed to reset auctions" });
   }
+});
+
+/* ==============================
+   SOCKET.IO
+============================== */
+const onlineUsers = {}; // userId → socketId
+
+io.on("connection", (socket) => {
+  console.log("🔌 Socket connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    if (!userId) return;
+    onlineUsers[userId] = socket.id;
+    socket.userId = userId;
+    socket.join(userId);
+    console.log(`👤 User ${userId} online`);
+
+    socket.broadcast.emit("userOnline", userId);
+    socket.emit("onlineUsers", Object.keys(onlineUsers));
+  });
+
+  socket.on(
+    "sendMessage",
+    async ({ to, from, message, imageUrl, messageType }) => {
+      try {
+        if (!to || !from) return;
+
+        const msg = await Message.create({
+          senderId: from,
+          receiverId: to,
+          message: message || "",
+          messageType: messageType || (imageUrl ? "image" : "text"),
+          imageUrl: imageUrl || "",
+          read: false,
+        });
+
+        const sender = await User.findById(from).select("username avatar");
+
+        const payload = {
+          ...msg.toObject(),
+          senderName: sender?.username || "User",
+          senderId: from,
+        };
+
+        io.to(to).emit("newMessage", payload);
+        socket.emit("messageSent", payload);
+
+        await Notification.create({
+          userId: to,
+          type: "message",
+          message: `💬 ${sender?.username || "Someone"} sent you a message`,
+          link: `chat:${from}`,
+        }).catch(() => {});
+      } catch (err) {
+        console.error("[Socket] sendMessage error:", err.message);
+        socket.emit("messageError", { error: "Failed to send message" });
+      }
+    },
+  );
+
+  socket.on("typing", ({ to, from, username }) => {
+    io.to(to).emit("typing", { from, username });
+  });
+
+  socket.on("stopTyping", ({ to, from }) => {
+    io.to(to).emit("stopTyping", { from });
+  });
+
+  socket.on("disconnect", () => {
+    const userId = socket.userId;
+    if (userId) {
+      delete onlineUsers[userId];
+      socket.broadcast.emit("userOffline", userId);
+      console.log(`👤 User ${userId} offline`);
+    }
+    console.log("🔌 Socket disconnected:", socket.id);
+  });
 });
 
 /* ==============================

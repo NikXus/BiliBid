@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>BiliBid — Order Tracking</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #070e1a;
+        --surface: #0d1929;
+        --surface2: #112038;
+        --surface3: #172944;
+        --border: rgba(255, 255, 255, 0.07);
+        --blue: #2563eb;
+        --blue-light: #3b82f6;
+        --gold: #f59e0b;
+        --gold-light: #fbbf24;
+        --green: #10b981;
+        --red: #ef4444;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --muted2: #94a3b8;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        min-height: 100vh;
+      }
+      .topbar {
+        background: rgba(7, 14, 26, 0.97);
+        border-bottom: 1px solid var(--border);
+        height: 60px;
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        gap: 16px;
+      }
+      .logo {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 26px;
+        letter-spacing: 2px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .logo span {
+        color: var(--gold);
+      }
+      .container {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+      .page-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 28px;
+        margin-bottom: 6px;
+      }
+      .page-sub {
+        color: var(--muted2);
+        font-size: 14px;
+        margin-bottom: 32px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+      .order-info {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .order-thumb {
+        width: 72px;
+        height: 72px;
+        border-radius: 14px;
+        background: var(--surface2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .order-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 14px;
+      }
+      .order-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+      .order-meta {
+        font-size: 13px;
+        color: var(--muted2);
+      }
+      .order-price {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--gold-light);
+        margin-top: 4px;
+      }
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        border-radius: 50px;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 24px;
+      }
+      .status-pending {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--gold);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+      .status-confirmed {
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--blue-light);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+      .status-shipped {
+        background: rgba(139, 92, 246, 0.15);
+        color: #a78bfa;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+      }
+      .status-delivered {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--green);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+      .status-cancelled {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--red);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+      .tracking-timeline {
+        position: relative;
+        padding-left: 28px;
+      }
+      .timeline-line {
+        position: absolute;
+        left: 8px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: var(--border);
+        border-radius: 2px;
+      }
+      .timeline-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: linear-gradient(180deg, var(--blue), var(--green));
+        border-radius: 2px;
+        transition: height 1s ease;
+      }
+      .timeline-event {
+        position: relative;
+        margin-bottom: 28px;
+        padding-left: 12px;
+      }
+      .timeline-dot {
+        position: absolute;
+        left: -28px;
+        top: 2px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 3px solid var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 8px;
+      }
+      .dot-done {
+        background: var(--green);
+      }
+      .dot-active {
+        background: var(--blue);
+        animation: dotPulse 1.5s infinite;
+      }
+      .dot-pending {
+        background: var(--surface3);
+        border-color: var(--border);
+      }
+      @keyframes dotPulse {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+        }
+        50% {
+          transform: scale(1.15);
+          box-shadow: 0 0 0 6px rgba(37, 99, 235, 0);
+        }
+      }
+      .event-status {
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 3px;
+      }
+      .event-msg {
+        font-size: 13px;
+        color: var(--muted2);
+      }
+      .event-loc {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .event-time {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .steps-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 28px;
+      }
+      .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .step-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        border: 2px solid var(--border);
+        background: var(--surface2);
+      }
+      .step-icon.done {
+        background: rgba(16, 185, 129, 0.15);
+        border-color: var(--green);
+      }
+      .step-icon.active {
+        background: rgba(37, 99, 235, 0.15);
+        border-color: var(--blue-light);
+      }
+      .step-label {
+        font-size: 11px;
+        color: var(--muted2);
+        text-align: center;
+      }
+      .step-label.done {
+        color: var(--green);
+      }
+      .step-label.active {
+        color: var(--blue-light);
+        font-weight: 700;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .info-item {
+        background: var(--surface2);
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid var(--border);
+      }
+      .info-label {
+        font-size: 11px;
+        color: var(--muted2);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+      }
+      .info-value {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted2);
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+        margin-bottom: 24px;
+      }
+      .back-btn:hover {
+        color: var(--text);
+        border-color: var(--blue-light);
+      }
+      .loading-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted2);
+      }
+      .loading-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <a href="BiliBidMain.html" class="logo">Bili<span>Bid</span></a>
+      <span style="color: var(--muted2); font-size: 14px"
+        >/ Order Tracking</span
+      >
+    </div>
+
+    <div class="container">
+      <a href="javascript:window.close()" class="back-btn">← Back</a>
+      <div class="page-title">📦 Order Tracking</div>
+      <div class="page-sub">Real-time status of your order</div>
+      <div id="trackingContent">
+        <div class="loading-state">
+          <div class="loading-icon">📦</div>
+          <div>Loading order details…</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "https://bilibid-1.onrender.com";
+
+      const STATUS_STEPS = [
+        { key: "pending", icon: "🕐", label: "Order Placed" },
+        { key: "confirmed", icon: "✅", label: "Confirmed" },
+        { key: "shipped", icon: "🚚", label: "Shipped" },
+        { key: "delivered", icon: "🏠", label: "Delivered" },
+      ];
+
+      const STATUS_INFO = {
+        pending: { cls: "status-pending", icon: "🕐", label: "Order Placed" },
+        confirmed: { cls: "status-confirmed", icon: "✅", label: "Confirmed" },
+        shipped: { cls: "status-shipped", icon: "🚚", label: "In Transit" },
+        delivered: { cls: "status-delivered", icon: "🏠", label: "Delivered" },
+        cancelled: { cls: "status-cancelled", icon: "✕", label: "Cancelled" },
+      };
+
+      function getToken() {
+        return (
+          localStorage.getItem("bbToken") ||
+          new URLSearchParams(window.location.search).get("token") ||
+          ""
+        );
+      }
+
+      function timeAgo(d) {
+        const diff = (Date.now() - new Date(d)) / 1000;
+        if (diff < 60) return "just now";
+        if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+        if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+        return new Date(d).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      async function loadOrder(auctionId) {
+        const c = document.getElementById("trackingContent");
+
+        const orders = await fetch(`${API_BASE}/api/orders`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        })
+          .then((r) => r.json())
+          .catch(() => []);
+
+        const order = Array.isArray(orders)
+          ? orders.find(
+              (o) =>
+                String(o.auctionId) === String(auctionId) ||
+                String(o._id) === String(auctionId),
+            )
+          : null;
+
+        if (!order) {
+          c.innerHTML = `<div class="card" style="text-align:center;padding:40px">
+          <div style="font-size:48px;margin-bottom:12px">🔍</div>
+          <div style="font-weight:700;font-size:18px;margin-bottom:8px">Order Not Found</div>
+          <div style="color:var(--muted2);font-size:13px">We couldn't find tracking info for this order.<br>It may still be processing.</div>
+          <div style="margin-top:20px;background:var(--surface2);border-radius:14px;padding:20px;border:1px solid var(--border)">
+            <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Demo Tracking Preview</div>
+            ${renderDemoTracking()}
+          </div>
+        </div>`;
+          return;
+        }
+
+        renderOrderTracking(c, order);
+      }
+
+      function renderDemoTracking() {
+        const demoEvents = [
+          {
+            status: "pending",
+            message: "Order placed via BiliBid Auction",
+            location: "",
+            timestamp: new Date(Date.now() - 86400 * 2 * 1000),
+          },
+          {
+            status: "confirmed",
+            message: "Seller confirmed your order",
+            location: "Manila, PH",
+            timestamp: new Date(Date.now() - 86400 * 1000),
+          },
+          {
+            status: "shipped",
+            message: "Package picked up by carrier",
+            location: "Manila, PH",
+            timestamp: new Date(Date.now() - 3600 * 6 * 1000),
+          },
+          {
+            status: "shipped",
+            message: "In transit to sorting facility",
+            location: "Caloocan, PH",
+            timestamp: new Date(Date.now() - 3600 * 2 * 1000),
+          },
+        ];
+        return buildTimelineHtml(demoEvents, "shipped");
+      }
+
+      function renderOrderTracking(c, order) {
+        const status = order.orderStatus || "pending";
+        const si = STATUS_INFO[status] || STATUS_INFO.pending;
+        const stepIdx = STATUS_STEPS.findIndex((s) => s.key === status);
+        const imgEl = order.auctionImage
+          ? `<img src="${API_BASE}${order.auctionImage}" style="width:100%;height:100%;object-fit:cover;border-radius:14px">`
+          : "📦";
+
+        const stepsHtml = STATUS_STEPS.map((s, i) => {
+          let cls = "pending";
+          if (i < stepIdx) cls = "done";
+          if (i === stepIdx) cls = "active";
+          return `<div class="step">
+          <div class="step-icon ${cls}">${s.icon}</div>
+          <div class="step-label ${cls}">${s.label}</div>
+        </div>`;
+        }).join("");
+
+        const events = order.trackingEvents?.length
+          ? order.trackingEvents
+          : [
+              {
+                status: "pending",
+                message: "Order placed",
+                timestamp: order.createdAt,
+              },
+            ];
+
+        c.innerHTML = `
+        <div class="card">
+          <div class="order-info">
+            <div class="order-thumb">${imgEl}</div>
+            <div>
+              <div class="order-title">${escHtml(order.auctionTitle || "Order")}</div>
+              <div class="order-meta">from <strong>${escHtml(order.sellerName || "Seller")}</strong></div>
+              <div class="order-price">₱${(order.amount || 0).toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div class="status-badge ${si.cls}">${si.icon} ${si.label}</div>
+
+          <div class="steps-row">${stepsHtml}</div>
+
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:16px">Tracking Timeline</div>
+          ${buildTimelineHtml(events, status)}
+        </div>
+
+        <div class="card">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:16px">Order Details</div>
+          <div class="info-grid">
+            <div class="info-item"><div class="info-label">Order ID</div><div class="info-value" style="font-size:12px;font-family:monospace">${String(order._id).slice(-8).toUpperCase()}</div></div>
+            <div class="info-item"><div class="info-label">Payment</div><div class="info-value">${escHtml(order.paymentMethod || "BiliBid Wallet")}</div></div>
+            <div class="info-item"><div class="info-label">Seller</div><div class="info-value">${escHtml(order.sellerName || "—")}</div></div>
+            <div class="info-item"><div class="info-label">Carrier</div><div class="info-value">${escHtml(order.trackingCarrier || "TBD")}</div></div>
+            ${order.trackingNumber ? `<div class="info-item" style="grid-column:1/-1"><div class="info-label">Tracking Number</div><div class="info-value" style="font-family:monospace">${escHtml(order.trackingNumber)}</div></div>` : ""}
+          </div>
+        </div>
+
+        ${
+          status !== "delivered" && status !== "cancelled"
+            ? `
+        <div class="card" style="text-align:center;background:rgba(37,99,235,.05);border-color:rgba(37,99,235,.2)">
+          <div style="font-size:20px;margin-bottom:8px">📨</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:4px">Have questions about your order?</div>
+          <div style="font-size:13px;color:var(--muted2);margin-bottom:14px">Contact the seller directly via BiliBid chat</div>
+          <button onclick="window.close()" style="background:linear-gradient(135deg,var(--blue),#1d4ed8);color:#fff;border:none;padding:10px 24px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer">💬 Message Seller</button>
+        </div>`
+            : ""
+        }`;
+      }
+
+      function buildTimelineHtml(events, currentStatus) {
+        const completedStatuses = ["confirmed", "shipped", "delivered"];
+        return `<div class="tracking-timeline">
+        <div class="timeline-line"><div class="timeline-fill" style="height:${getTimelinePct(currentStatus)}%"></div></div>
+        ${[...events]
+          .reverse()
+          .map((e, i) => {
+            const isLatest = i === 0;
+            const isDone = !isLatest;
+            const dotCls = isDone ? "dot-done" : "dot-active";
+            return `<div class="timeline-event">
+            <div class="timeline-dot ${dotCls}"></div>
+            <div class="event-status">${capitalise(e.status || "Update")}</div>
+            <div class="event-msg">${escHtml(e.message || "")}</div>
+            ${e.location ? `<div class="event-loc">📍 ${escHtml(e.location)}</div>` : ""}
+            <div class="event-time">${timeAgo(e.timestamp)}</div>
+          </div>`;
+          })
+          .join("")}
+      </div>`;
+      }
+
+      function getTimelinePct(status) {
+        const map = {
+          pending: 10,
+          confirmed: 40,
+          shipped: 70,
+          delivered: 100,
+          cancelled: 100,
+        };
+        return map[status] || 10;
+      }
+
+      function capitalise(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+      function escHtml(s) {
+        return String(s || "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+
+      // Init
+      const params = new URLSearchParams(window.location.search);
+      const auctionId = params.get("auctionId") || "";
+      if (auctionId) loadOrder(auctionId);
+      else {
+        document.getElementById("trackingContent").innerHTML = `
+        <div class="card" style="text-align:center;padding:40px">
+          <div style="font-size:48px;margin-bottom:12px">🔍</div>
+          <div style="font-weight:700;font-size:18px;margin-bottom:8px">No Order ID Provided</div>
+          <div style="color:var(--muted2);font-size:13px">Open this page from your Won Auctions or My Auctions page.</div>
+        </div>`;
+      }
+    </script>
+  </body>
+</html>

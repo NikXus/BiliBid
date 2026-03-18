@@ -3,12 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>BiliBid — Dashboard</title>
+    <title>BiliBid — Social Marketplace</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏷️</text></svg>"
+    />
     <link
       href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
     <style>
+      /* ── CSS Variables ── */
       :root {
         --bg: #070e1a;
         --surface: #0d1929;
@@ -39,6 +44,8 @@
         min-height: 100vh;
         overflow-x: hidden;
       }
+
+      /* ── Topbar ── */
       .topbar {
         position: fixed;
         top: 0;
@@ -102,6 +109,8 @@
         display: none;
         z-index: 200;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        max-height: 400px;
+        overflow-y: auto;
       }
       .search-result-item {
         padding: 10px 12px;
@@ -169,6 +178,7 @@
         border: 2px solid var(--gold);
         position: relative;
         color: #fff;
+        overflow: hidden;
       }
       .avatar-btn::after {
         content: "";
@@ -201,6 +211,30 @@
         transform: translateY(-1px);
         box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
       }
+      .btn-auth {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-family: "DM Sans", sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .btn-auth:hover {
+        color: var(--text);
+        border-color: var(--blue-light);
+      }
+      .btn-auth.primary {
+        background: linear-gradient(135deg, var(--blue), var(--accent));
+        color: #fff;
+        border-color: transparent;
+      }
+
+      /* ── Layout ── */
       .layout {
         display: grid;
         grid-template-columns: 260px minmax(0, 1fr) 300px;
@@ -218,10 +252,12 @@
         background: var(--surface);
         width: 260px;
       }
-      .sidebar-left::-webkit-scrollbar {
+      .sidebar-left::-webkit-scrollbar,
+      .sidebar-right::-webkit-scrollbar {
         width: 4px;
       }
-      .sidebar-left::-webkit-scrollbar-thumb {
+      .sidebar-left::-webkit-scrollbar-thumb,
+      .sidebar-right::-webkit-scrollbar-thumb {
         background: var(--surface3);
         border-radius: 4px;
       }
@@ -253,17 +289,7 @@
         border: 3px solid var(--gold);
         position: relative;
         color: #fff;
-      }
-      .profile-avatar::after {
-        content: "";
-        position: absolute;
-        bottom: 2px;
-        right: 2px;
-        width: 14px;
-        height: 14px;
-        background: var(--online);
-        border-radius: 50%;
-        border: 2px solid var(--surface2);
+        overflow: hidden;
       }
       .profile-name {
         font-family: "Syne", sans-serif;
@@ -373,6 +399,8 @@
         border-radius: 50%;
         flex-shrink: 0;
       }
+
+      /* ── Pages ── */
       .page {
         display: none;
       }
@@ -383,6 +411,8 @@
         min-width: 0;
         overflow: hidden;
       }
+
+      /* ── Ticker ── */
       .ticker-wrap {
         background: var(--surface2);
         border-bottom: 1px solid var(--border);
@@ -404,7 +434,7 @@
         }
       }
       .ticker-item {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
         font-size: 12px;
@@ -414,6 +444,8 @@
         color: var(--gold);
         font-weight: 600;
       }
+
+      /* ── Stories ── */
       .stories-bar {
         display: flex;
         gap: 12px;
@@ -459,6 +491,7 @@
         justify-content: center;
         font-size: 22px;
         border: 3px solid var(--bg);
+        overflow: hidden;
       }
       .story-name {
         font-size: 11px;
@@ -474,6 +507,8 @@
         color: var(--red);
         font-weight: 700;
       }
+
+      /* ── Composer ── */
       .composer {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -500,6 +535,7 @@
         flex-shrink: 0;
         border: 2px solid var(--gold);
         color: #fff;
+        overflow: hidden;
       }
       .composer-input {
         flex: 1;
@@ -541,6 +577,8 @@
         color: var(--text);
         border-color: var(--blue-light);
       }
+
+      /* ── Filter tabs ── */
       .filter-tabs {
         display: flex;
         gap: 6px;
@@ -571,6 +609,8 @@
         border-color: var(--blue-light);
         color: var(--text);
       }
+
+      /* ── Auction post ── */
       .auction-post {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -602,6 +642,8 @@
         cursor: pointer;
         border: 2px solid rgba(255, 255, 255, 0.1);
         color: #fff;
+        overflow: hidden;
+        position: relative;
       }
       .post-meta {
         flex: 1;
@@ -614,8 +656,10 @@
         gap: 6px;
         flex-wrap: wrap;
       }
-      .verified {
+      .clickable-name:hover {
+        text-decoration: underline;
         color: var(--blue-light);
+        cursor: pointer;
       }
       .seller-badge {
         background: rgba(245, 158, 11, 0.15);
@@ -659,7 +703,7 @@
         border-radius: 12px;
         padding: 6px;
         z-index: 50;
-        min-width: 160px;
+        min-width: 170px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         display: none;
       }
@@ -832,7 +876,6 @@
       .bid-input-row {
         display: flex;
         gap: 8px;
-        margin-bottom: 12px;
       }
       .bid-input {
         flex: 1;
@@ -1000,6 +1043,8 @@
       .comment-action:hover {
         color: var(--text);
       }
+
+      /* ── Right sidebar ── */
       .sidebar-right {
         position: sticky;
         top: 60px;
@@ -1009,13 +1054,6 @@
         border-left: 1px solid var(--border);
         background: var(--surface);
         width: 300px;
-      }
-      .sidebar-right::-webkit-scrollbar {
-        width: 4px;
-      }
-      .sidebar-right::-webkit-scrollbar-thumb {
-        background: var(--surface3);
-        border-radius: 4px;
       }
       .section-header {
         display: flex;
@@ -1082,9 +1120,8 @@
       .status-live {
         color: var(--red);
       }
-      .status-won {
-        color: var(--green);
-      }
+
+      /* ── Notifications ── */
       .notif-item {
         display: flex;
         gap: 10px;
@@ -1122,67 +1159,13 @@
         color: var(--muted);
         margin-top: 2px;
       }
-      .online-user {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      .online-user:hover {
-        background: var(--surface2);
-      }
-      .online-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 14px;
-        flex-shrink: 0;
-        position: relative;
-        color: #fff;
-      }
-      .online-avatar::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        border: 2px solid var(--surface);
-      }
-      .online-avatar.on::after {
-        background: var(--online);
-      }
-      .online-avatar.off::after {
-        background: var(--muted);
-      }
-      .online-avatar.busy::after {
-        background: var(--gold);
-      }
-      .online-name {
-        font-size: 13px;
-        font-weight: 500;
-      }
-      .online-status {
-        font-size: 11px;
-        color: var(--muted);
-      }
-      .online-status.on {
-        color: var(--green);
-      }
-      /* CHAT POPUP — fixed height, internal scroll */
+
+      /* ── Chat popup ── */
       .chat-popup {
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 320px;
+        width: 340px;
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 20px;
@@ -1191,7 +1174,7 @@
         overflow: hidden;
         display: none;
         flex-direction: column;
-        height: 420px;
+        height: 480px;
         max-height: 80vh;
       }
       .chat-popup.open {
@@ -1218,17 +1201,7 @@
         position: relative;
         flex-shrink: 0;
         color: #fff;
-      }
-      .chat-h-av::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 10px;
-        height: 10px;
-        background: var(--online);
-        border-radius: 50%;
-        border: 2px solid var(--surface2);
+        overflow: hidden;
       }
       .chat-header-name {
         font-weight: 600;
@@ -1272,7 +1245,7 @@
         border-radius: 4px;
       }
       .msg {
-        max-width: 78%;
+        max-width: 80%;
         padding: 10px 13px;
         border-radius: 16px;
         font-size: 13px;
@@ -1297,14 +1270,28 @@
       .msg.me .msg-time {
         text-align: right;
       }
+      .chat-img-preview {
+        max-width: 200px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: block;
+        margin-top: 4px;
+      }
       .chat-input-row {
-        padding: 12px;
+        padding: 10px 12px;
         display: flex;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
         border-top: 1px solid var(--border);
         background: var(--surface2);
         flex-shrink: 0;
+        flex-direction: column;
+      }
+      .chat-input-area {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        width: 100%;
       }
       .chat-input {
         flex: 1;
@@ -1339,18 +1326,46 @@
       .chat-send:hover {
         transform: scale(1.1);
       }
+      .chat-img-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        color: var(--muted2);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .chat-img-btn:hover {
+        background: var(--surface);
+        color: var(--text);
+      }
+      .chat-img-btn input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
       .chat-bubbles {
         position: fixed;
         bottom: 20px;
-        right: 350px;
+        right: 380px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
         z-index: 150;
       }
       .chat-bubble {
-        width: 48px;
-        height: 48px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -1363,16 +1378,17 @@
         position: relative;
         border: 3px solid var(--bg);
         color: #fff;
+        overflow: hidden;
       }
       .chat-bubble:hover {
-        transform: scale(1.1);
+        transform: scale(1.12);
       }
       .unread-dot {
         position: absolute;
         top: -2px;
         right: -2px;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         background: var(--red);
         border-radius: 50%;
         font-size: 9px;
@@ -1383,6 +1399,8 @@
         justify-content: center;
         border: 2px solid var(--bg);
       }
+
+      /* ── Modals ── */
       .modal-overlay {
         position: fixed;
         inset: 0;
@@ -1538,6 +1556,13 @@
         transform: translateY(-1px);
         box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
       }
+      .btn-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* ── Pages ── */
       .page-header {
         font-family: "Syne", sans-serif;
         font-weight: 800;
@@ -1734,6 +1759,51 @@
         border-color: var(--red);
         color: var(--red);
       }
+
+      /* ── Conversations ── */
+      .conversation-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 8px;
+        border: 1px solid transparent;
+      }
+      .conversation-item:hover {
+        background: var(--surface2);
+        border-color: var(--border);
+      }
+
+      /* ── Profile stat blocks ── */
+      .profile-stat-block {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex: 1;
+      }
+      .profile-stat-block:hover {
+        border-color: var(--blue-light);
+      }
+      .profile-stat-num {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--gold);
+      }
+      .profile-stat-label {
+        font-size: 12px;
+        color: var(--muted2);
+        margin-top: 3px;
+      }
+
+      /* ── Confirm & toast ── */
       .confirm-overlay {
         position: fixed;
         inset: 0;
@@ -1847,7 +1917,174 @@
         border-color: var(--gold);
         color: var(--gold);
       }
-      /* Follow button */
+
+      /* ── Story viewer ── */
+      .story-viewer-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.92);
+        backdrop-filter: blur(20px);
+        z-index: 600;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .story-viewer-overlay.open {
+        display: flex;
+      }
+      .story-viewer-box {
+        position: relative;
+        width: 100%;
+        max-width: 440px;
+        padding: 20px;
+      }
+      .sv-progress {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+        margin-bottom: 16px;
+        overflow: hidden;
+      }
+      .sv-progress-fill {
+        height: 100%;
+        background: #fff;
+        border-radius: 3px;
+        width: 0%;
+      }
+      .sv-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .sv-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        transition: all 0.2s;
+      }
+      .sv-close:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .sv-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        transition: all 0.2s;
+      }
+      .sv-nav:hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .sv-prev {
+        left: 0;
+      }
+      .sv-next {
+        right: 0;
+      }
+      .sv-reply {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 16px;
+      }
+      .sv-reply input {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 50px;
+        padding: 10px 16px;
+        color: #fff;
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        outline: none;
+      }
+      .sv-reply button {
+        background: var(--blue);
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 50px;
+        font-size: 13px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+
+      /* ── User profile modal ── */
+      .up-modal {
+        max-width: 600px;
+      }
+      .up-cover {
+        height: 120px;
+        background: linear-gradient(
+          135deg,
+          var(--blue),
+          var(--accent),
+          var(--gold)
+        );
+        border-radius: 16px 16px 0 0;
+        margin: -28px -28px 0;
+      }
+      .up-avatar-wrap {
+        margin-top: -50px;
+        margin-left: 20px;
+        margin-bottom: 12px;
+      }
+      .up-avatar-img {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), var(--gold));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        font-weight: 800;
+        font-family: "Syne", sans-serif;
+        border: 4px solid var(--surface);
+        color: #fff;
+        overflow: hidden;
+      }
+      .up-stats {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .up-stat {
+        text-align: center;
+      }
+      .up-stat-num {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 20px;
+        color: var(--gold);
+      }
+      .up-stat-label {
+        font-size: 11px;
+        color: var(--muted2);
+      }
       .follow-btn {
         background: linear-gradient(135deg, var(--blue), var(--accent));
         color: #fff;
@@ -1864,34 +2101,67 @@
         transform: translateY(-1px);
         opacity: 0.9;
       }
-      /* Stat blocks for profile */
-      .profile-stat-block {
+
+      /* ── Auth tabs ── */
+      .auth-tabs {
+        display: flex;
         background: var(--surface2);
-        border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 14px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s;
+        padding: 4px;
+        margin-bottom: 24px;
+        border: 1px solid var(--border);
+      }
+      .auth-tab {
         flex: 1;
-      }
-      .profile-stat-block:hover {
-        border-color: var(--blue-light);
-      }
-      .profile-stat-num {
-        font-family: "Syne", sans-serif;
-        font-weight: 800;
-        font-size: 22px;
-        color: var(--gold);
-      }
-      .profile-stat-label {
-        font-size: 12px;
+        padding: 10px;
+        text-align: center;
+        border-radius: 9px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
         color: var(--muted2);
-        margin-top: 3px;
+        transition: all 0.2s;
+      }
+      .auth-tab.active {
+        background: var(--surface3);
+        color: var(--text);
+      }
+      .auth-divider {
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 14px 0;
+      }
+
+      /* ── Guest banner ── */
+      #guestBanner {
+        background: linear-gradient(
+          135deg,
+          rgba(37, 99, 235, 0.15),
+          rgba(245, 158, 11, 0.1)
+        );
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      /* ── Loading ── */
+      .loading-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--muted2);
+        font-size: 14px;
       }
     </style>
   </head>
   <body>
+    <!-- ══ TOPBAR ══ -->
     <div class="topbar">
       <div class="logo" onclick="navigate('feed')">Bili<span>Bid</span></div>
       <div class="topbar-search">
@@ -1899,53 +2169,82 @@
         <input
           type="text"
           id="searchInput"
-          placeholder="Search auctions, sellers, items..."
+          placeholder="Search auctions, sellers…"
           oninput="handleSearch(this.value)"
           onfocus="showSR()"
-          onblur="setTimeout(hideSR, 200)"
+          onblur="hideSR()"
         />
         <div class="search-results" id="searchResults"></div>
       </div>
       <div class="topbar-actions">
         <div
-          class="icon-btn"
-          onclick="navigate('notifications')"
-          title="Notifications"
+          id="loggedInActions"
+          style="display: none; align-items: center; gap: 8px"
         >
-          🔔
-          <div class="badge" id="notifBadge">3</div>
+          <div
+            class="icon-btn"
+            onclick="navigate('notifications')"
+            title="Notifications"
+          >
+            🔔
+            <div class="badge" id="notifBadge" style="display: none">0</div>
+          </div>
+          <div class="icon-btn" onclick="navigate('wallet')" title="Wallet">
+            💰
+          </div>
+          <div class="icon-btn" onclick="navigate('messages')" title="Messages">
+            💬
+          </div>
+          <div
+            class="icon-btn"
+            onclick="navigate('watchlist')"
+            title="Watchlist"
+          >
+            🏷️
+          </div>
+          <button class="btn-post" onclick="openModal()">
+            ＋ Post Auction
+          </button>
+          <div
+            class="avatar-btn"
+            id="topbarAvatar"
+            onclick="navigate('profile')"
+            title="My Profile"
+          >
+            ??
+          </div>
+          <button
+            class="btn-auth"
+            onclick="logout()"
+            style="padding: 8px 12px"
+            title="Log Out"
+          >
+            🚪
+          </button>
         </div>
         <div
-          class="icon-btn"
-          onclick="openChatByName('MariaSells')"
-          title="Messages"
+          id="loggedOutActions"
+          style="display: flex; align-items: center; gap: 8px"
         >
-          💬
-          <div class="badge" id="msgBadge">2</div>
-        </div>
-        <div class="icon-btn" onclick="navigate('watchlist')" title="Watchlist">
-          🏷️
-        </div>
-        <button class="btn-post" onclick="checkVerifiedAndPost()">
-          ＋ Post Auction
-        </button>
-        <div
-          class="avatar-btn"
-          onclick="navigate('profile')"
-          title="My Profile"
-        >
-          JN
+          <button class="btn-auth" onclick="openAuthModal('login')">
+            Log In
+          </button>
+          <button class="btn-auth primary" onclick="openAuthModal('register')">
+            Sign Up
+          </button>
         </div>
       </div>
     </div>
 
+    <!-- ══ LAYOUT ══ -->
     <div class="layout">
+      <!-- ── LEFT SIDEBAR ── -->
       <aside class="sidebar-left">
         <div class="profile-card" onclick="navigate('profile')">
-          <div class="profile-avatar">JN</div>
-          <div class="profile-name">Jarme Nathaniel</div>
+          <div class="profile-avatar" id="sidebarAvatarText">??</div>
+          <div class="profile-name" id="sidebarName">Guest</div>
           <div class="profile-handle" id="sidebarHandle">
-            @jarmenathaniel · ⭐ 4.9
+            Browse &amp; bid on auctions
           </div>
           <div class="profile-stats">
             <div
@@ -1955,7 +2254,7 @@
                 navigate('my-auctions');
               "
             >
-              <div class="stat-num" id="listedCount">24</div>
+              <div class="stat-num" id="listedCount">—</div>
               <div class="stat-label">Listed</div>
             </div>
             <div
@@ -1965,18 +2264,18 @@
                 navigate('my-auctions');
               "
             >
-              <div class="stat-num">18</div>
+              <div class="stat-num" id="soldCount">—</div>
               <div class="stat-label">Sold</div>
             </div>
             <div
               class="stat"
               onclick="
                 event.stopPropagation();
-                navigate('feed');
+                navigate('wallet');
               "
             >
-              <div class="stat-num">152</div>
-              <div class="stat-label">Bids</div>
+              <div class="stat-num" id="sidebarWalletBal">₱0</div>
+              <div class="stat-label">Wallet</div>
             </div>
           </div>
         </div>
@@ -1986,12 +2285,17 @@
           </div>
           <div
             class="nav-item"
+            id="nav-messages"
+            onclick="navigate('messages')"
+          >
+            <span class="nav-icon">💬</span>Messages
+          </div>
+          <div
+            class="nav-item"
             id="nav-my-auctions"
             onclick="navigate('my-auctions')"
           >
-            <span class="nav-icon">📦</span>My Auctions<span class="nav-badge"
-              >3</span
-            >
+            <span class="nav-icon">📦</span>My Auctions
           </div>
           <div
             class="nav-item"
@@ -2001,7 +2305,8 @@
             <span class="nav-icon">👁️</span>Watchlist<span
               class="nav-badge"
               id="watchBadge"
-              >5</span
+              style="display: none"
+              >0</span
             >
           </div>
           <div class="nav-item" id="nav-won" onclick="navigate('won')">
@@ -2015,7 +2320,8 @@
             <span class="nav-icon">🔔</span>Notifications<span
               class="nav-badge"
               id="notifNavBadge"
-              >3</span
+              style="display: none"
+              >0</span
             >
           </div>
           <div class="nav-item" id="nav-wallet" onclick="navigate('wallet')">
@@ -2053,6 +2359,7 @@
         </div>
       </aside>
 
+      <!-- ── MAIN ── -->
       <main id="mainArea">
         <div class="ticker-wrap">
           <div class="ticker">
@@ -2090,78 +2397,43 @@
         <!-- FEED -->
         <div class="page active" id="page-feed">
           <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
-            <div class="stories-bar">
-              <div class="story-item" onclick="checkVerifiedAndPost()">
-                <div
-                  class="story-ring"
-                  style="background: var(--surface3); padding: 2px"
+            <div class="stories-bar" id="storiesBar"></div>
+            <div id="guestBanner">
+              <p>
+                <strong>Welcome to BiliBid! 👋</strong> Log in to bid, watch
+                items, and post auctions.
+              </p>
+              <div style="display: flex; gap: 8px">
+                <button class="btn-auth" onclick="openAuthModal('login')">
+                  Log In
+                </button>
+                <button
+                  class="btn-auth primary"
+                  onclick="openAuthModal('register')"
                 >
-                  <div
-                    class="story-inner"
-                    style="
-                      background: linear-gradient(
-                        135deg,
-                        var(--blue),
-                        var(--accent)
-                      );
-                      font-size: 28px;
-                    "
-                  >
-                    ＋
-                  </div>
-                </div>
-                <div class="story-name">Go Live</div>
-              </div>
-              <div class="story-item" onclick="openChatByName('MariaSells')">
-                <div class="story-ring live-ring">
-                  <div class="story-inner">👟</div>
-                </div>
-                <div class="story-name">MariaSells</div>
-                <div class="story-label">LIVE</div>
-              </div>
-              <div class="story-item" onclick="openChatByName('TechHub PH')">
-                <div class="story-ring live-ring">
-                  <div class="story-inner">📱</div>
-                </div>
-                <div class="story-name">TechHub</div>
-                <div class="story-label">LIVE</div>
-              </div>
-              <div class="story-item">
-                <div class="story-ring"><div class="story-inner">💻</div></div>
-                <div class="story-name">GadgetPH</div>
-              </div>
-              <div class="story-item">
-                <div class="story-ring"><div class="story-inner">👜</div></div>
-                <div class="story-name">LuxuryMNL</div>
-              </div>
-              <div class="story-item">
-                <div class="story-ring"><div class="story-inner">🎮</div></div>
-                <div class="story-name">GamersHub</div>
-              </div>
-              <div class="story-item">
-                <div class="story-ring"><div class="story-inner">⌚</div></div>
-                <div class="story-name">WatchPH</div>
+                  Sign Up
+                </button>
               </div>
             </div>
             <div class="composer">
               <div class="composer-top">
-                <div class="composer-avatar">JN</div>
-                <div class="composer-input" onclick="checkVerifiedAndPost()">
-                  What are you selling today, Jarme?
+                <div class="composer-avatar" id="composerAvatar">?</div>
+                <div class="composer-input" onclick="openModal()">
+                  What are you selling today?
                 </div>
               </div>
               <div class="composer-actions">
-                <div class="composer-btn" onclick="checkVerifiedAndPost()">
+                <div class="composer-btn" onclick="openModal()">
                   📸 Add Photo
                 </div>
-                <div class="composer-btn" onclick="checkVerifiedAndPost()">
+                <div class="composer-btn" onclick="openModal()">
                   🏷️ Set Price
                 </div>
-                <div class="composer-btn" onclick="checkVerifiedAndPost()">
+                <div class="composer-btn" onclick="openModal()">
                   ⏱️ Duration
                 </div>
-                <div class="composer-btn" onclick="checkVerifiedAndPost()">
-                  🎮 Category
+                <div class="composer-btn" onclick="openPostStory()">
+                  📖 Add Story
                 </div>
               </div>
             </div>
@@ -2188,7 +2460,20 @@
                 Following
               </div>
             </div>
-            <div id="postsContainer"></div>
+            <div id="postsContainer">
+              <div class="loading-state">Loading auctions…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MESSAGES -->
+        <div class="page" id="page-messages">
+          <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
+            <div class="page-header">💬 Messages</div>
+            <div class="page-sub">Your conversations</div>
+            <div id="conversationsContent">
+              <div class="loading-state">Loading conversations…</div>
+            </div>
           </div>
         </div>
 
@@ -2204,20 +2489,16 @@
                 margin-bottom: 16px;
               "
             >
-              <button class="btn-submit" onclick="checkVerifiedAndPost()">
+              <button class="btn-submit" onclick="openModal()">
                 ＋ Post New Auction
               </button>
             </div>
             <div class="tab-switcher">
               <div class="tab-sw active" onclick="myAuctTab(this, 'active')">
-                Active (3)
+                Active
               </div>
-              <div class="tab-sw" onclick="myAuctTab(this, 'ended')">
-                Ended (2)
-              </div>
-              <div class="tab-sw" onclick="myAuctTab(this, 'sold')">
-                Sold (18)
-              </div>
+              <div class="tab-sw" onclick="myAuctTab(this, 'ended')">Ended</div>
+              <div class="tab-sw" onclick="myAuctTab(this, 'sold')">Sold</div>
             </div>
             <div id="myAuctContent"></div>
           </div>
@@ -2234,7 +2515,7 @@
           </div>
         </div>
 
-        <!-- WON AUCTIONS -->
+        <!-- WON -->
         <div class="page" id="page-won">
           <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
             <div class="page-header">🏆 Won Auctions</div>
@@ -2278,7 +2559,7 @@
               <div style="font-size: 13px; color: var(--muted2)">
                 Available Balance
               </div>
-              <div class="wallet-balance" id="walletBal">₱12,500.00</div>
+              <div class="wallet-balance" id="walletBal">₱0.00</div>
               <div style="font-size: 12px; color: var(--muted2)">
                 BiliBid Wallet · Updated just now
               </div>
@@ -2308,30 +2589,62 @@
         <div class="page" id="page-profile">
           <div style="padding: 24px 20px; max-width: 700px; margin: 0 auto">
             <div class="page-header">👤 Profile</div>
-            <div class="page-sub">
-              Manage your account &amp; identity verification
-            </div>
-
-            <!-- Profile card with followers/following -->
+            <div class="page-sub">Manage your account &amp; settings</div>
             <div class="card" style="text-align: center">
               <div
                 style="
-                  width: 90px;
-                  height: 90px;
-                  border-radius: 50%;
-                  background: linear-gradient(135deg, var(--blue), var(--gold));
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-size: 36px;
-                  font-weight: 800;
-                  font-family: &quot;Syne&quot;, sans-serif;
-                  border: 3px solid var(--gold);
-                  margin: 0 auto 16px;
-                  color: #fff;
+                  position: relative;
+                  display: inline-block;
+                  margin-bottom: 16px;
                 "
               >
-                JN
+                <div
+                  id="profileAvatarLarge"
+                  style="
+                    width: 90px;
+                    height: 90px;
+                    border-radius: 50%;
+                    background: linear-gradient(
+                      135deg,
+                      var(--blue),
+                      var(--gold)
+                    );
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 36px;
+                    font-weight: 800;
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    border: 3px solid var(--gold);
+                    color: #fff;
+                    overflow: hidden;
+                  "
+                >
+                  ??
+                </div>
+                <label
+                  style="
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    background: var(--blue);
+                    border: 2px solid var(--surface);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    font-size: 13px;
+                  "
+                  title="Change photo"
+                  >📷<input
+                    type="file"
+                    accept="image/*"
+                    style="display: none"
+                    onchange="uploadAvatar(this)"
+                /></label>
               </div>
               <div
                 style="
@@ -2341,32 +2654,14 @@
                 "
                 id="dispName"
               >
-                Jarme Nathaniel
+                —
               </div>
               <div
                 style="color: var(--muted2); font-size: 13px; margin: 4px 0 8px"
+                id="profileHandle"
               >
-                @jarmenathaniel
+                @—
               </div>
-              <div id="verifiedBadge" style="margin-bottom: 14px"></div>
-              <div
-                style="
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 6px;
-                  background: rgba(245, 158, 11, 0.15);
-                  border: 1px solid rgba(245, 158, 11, 0.3);
-                  border-radius: 50px;
-                  padding: 4px 14px;
-                  font-size: 12px;
-                  color: var(--gold);
-                  font-weight: 600;
-                  margin-bottom: 18px;
-                "
-              >
-                ⭐ 4.9 Seller Rating · 152 Reviews
-              </div>
-              <!-- Followers / Following / Follow button -->
               <div
                 style="
                   display: flex;
@@ -2377,82 +2672,65 @@
               >
                 <div
                   class="profile-stat-block"
-                  onclick="toast('👥 Followers list', 'info')"
+                  onclick="navigate('my-auctions')"
                 >
-                  <div class="profile-stat-num" id="followerCount">48</div>
-                  <div class="profile-stat-label">Followers</div>
-                </div>
-                <div
-                  class="profile-stat-block"
-                  onclick="toast('👥 Following list', 'info')"
-                >
-                  <div class="profile-stat-num" id="followingCount">31</div>
-                  <div class="profile-stat-label">Following</div>
+                  <div class="profile-stat-num" id="profileListedCount">—</div>
+                  <div class="profile-stat-label">Listings</div>
                 </div>
                 <div
                   class="profile-stat-block"
                   onclick="navigate('my-auctions')"
                 >
-                  <div class="profile-stat-num">24</div>
-                  <div class="profile-stat-label">Listings</div>
+                  <div class="profile-stat-num" id="profileSoldCount">—</div>
+                  <div class="profile-stat-label">Sold</div>
+                </div>
+                <div class="profile-stat-block" onclick="navigate('wallet')">
+                  <div class="profile-stat-num" id="profileWalletBal">₱0</div>
+                  <div class="profile-stat-label">Wallet</div>
                 </div>
               </div>
               <button
-                class="follow-btn"
-                id="followSelfBtn"
-                data-following="false"
-                onclick="toggleFollow(this)"
+                style="
+                  background: linear-gradient(135deg, var(--red), #c2410c);
+                  color: #fff;
+                  border: none;
+                  padding: 10px 24px;
+                  border-radius: 50px;
+                  font-weight: 700;
+                  font-size: 13px;
+                  cursor: pointer;
+                "
+                onclick="logout()"
               >
-                + Follow
+                🚪 Log Out
               </button>
             </div>
-
-            <!-- ID Verification -->
-            <div class="card">
-              <div class="card-title">🪪 ID Verification</div>
-              <div id="verificationSection"><!-- rendered by JS --></div>
-            </div>
-
-            <!-- Edit Profile -->
             <div class="card">
               <div class="card-title">✏️ Edit Profile</div>
               <div class="form-group">
-                <label class="form-label">Full Name</label
+                <label class="form-label">Username</label
                 ><input
                   class="form-input"
                   id="editName"
-                  value="Jarme Nathaniel"
+                  placeholder="Your username"
                 />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Username</label
-                ><input class="form-input" value="@jarmenathaniel" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Email</label
-                ><input
-                  class="form-input"
-                  value="jarmenathaniel@gmail.com"
-                  type="email"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Phone</label
-                ><input
-                  class="form-input"
-                  value="+63 912 345 6789"
-                  type="tel"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Location</label
-                ><input class="form-input" value="Manila, Philippines" />
               </div>
               <div class="form-group">
                 <label class="form-label">Bio</label
-                ><textarea class="form-textarea" style="min-height: 70px">
-Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</textarea
-                >
+                ><textarea
+                  class="form-textarea"
+                  id="editBio"
+                  style="min-height: 70px"
+                  placeholder="Tell buyers about yourself…"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location</label
+                ><input
+                  class="form-input"
+                  id="editLocation"
+                  placeholder="e.g. Manila, Philippines"
+                />
               </div>
               <button
                 class="btn-submit"
@@ -2462,14 +2740,10 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 💾 Save Changes
               </button>
             </div>
-
-            <!-- Buyer Reviews -->
             <div class="card">
               <div class="card-title">⭐ Buyer Reviews</div>
-              <div id="reviewsContent"><!-- rendered by JS --></div>
+              <div id="reviewsContent"></div>
             </div>
-
-            <!-- Security -->
             <div class="card">
               <div class="card-title">🔒 Security</div>
               <div class="form-group">
@@ -2488,14 +2762,6 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                   placeholder="••••••••"
                 />
               </div>
-              <div class="form-group">
-                <label class="form-label">Confirm Password</label
-                ><input
-                  class="form-input"
-                  type="password"
-                  placeholder="••••••••"
-                />
-              </div>
               <button
                 class="btn-submit"
                 onclick="savePassword()"
@@ -2508,6 +2774,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
         </div>
       </main>
 
+      <!-- ── RIGHT SIDEBAR ── -->
       <aside class="sidebar-right">
         <div style="margin-bottom: 20px">
           <div class="section-header">
@@ -2516,7 +2783,11 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
               See all
             </div>
           </div>
-          <div id="sidebarNotifs"></div>
+          <div id="sidebarNotifs">
+            <div style="font-size: 12px; color: var(--muted2); padding: 8px">
+              No notifications yet.
+            </div>
+          </div>
         </div>
         <div class="section-header">
           <div class="section-title">📦 My Active Listings</div>
@@ -2524,104 +2795,9 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
             See all
           </div>
         </div>
-        <div class="my-auction-item" onclick="navigate('my-auctions')">
-          <div class="auction-thumb">🎮</div>
-          <div style="flex: 1; min-width: 0">
-            <div class="auction-name">PS5 DualSense Controller</div>
-            <div class="auction-price">₱2,800</div>
-            <div class="auction-status">
-              <span class="status-live">● LIVE</span> · 12 bids · 1d 2h left
-            </div>
-          </div>
-        </div>
-        <div class="my-auction-item" onclick="navigate('my-auctions')">
-          <div class="auction-thumb">📷</div>
-          <div style="flex: 1; min-width: 0">
-            <div class="auction-name">Sony Camera Lens 50mm</div>
-            <div class="auction-price">₱5,500</div>
-            <div class="auction-status">
-              <span class="status-live">● LIVE</span> · 8 bids · 3h left
-            </div>
-          </div>
-        </div>
-        <div class="my-auction-item" onclick="navigate('won')">
-          <div class="auction-thumb">⌚</div>
-          <div style="flex: 1; min-width: 0">
-            <div class="auction-name">Casio G-Shock DW5600</div>
-            <div class="auction-price">₱3,100</div>
-            <div class="auction-status">
-              <span class="status-won">✓ Sold!</span>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top: 20px">
-          <div class="section-header">
-            <div class="section-title">💬 Contacts</div>
-            <div class="section-link" onclick="openChatByName('MariaSells')">
-              New chat
-            </div>
-          </div>
-          <div class="online-user" onclick="openChatByName('MariaSells')">
-            <div
-              class="online-avatar on"
-              style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
-            >
-              MS
-            </div>
-            <div>
-              <div class="online-name">MariaSells</div>
-              <div class="online-status on">Active now</div>
-            </div>
-          </div>
-          <div class="online-user" onclick="openChatByName('TechHub PH')">
-            <div
-              class="online-avatar on"
-              style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
-            >
-              TH
-            </div>
-            <div>
-              <div class="online-name">TechHub PH</div>
-              <div class="online-status on">Active now</div>
-            </div>
-          </div>
-          <div class="online-user" onclick="openChatByName('Karl Sneakers')">
-            <div
-              class="online-avatar busy"
-              style="background: linear-gradient(135deg, #10b981, #0891b2)"
-            >
-              KS
-            </div>
-            <div>
-              <div class="online-name">Karl Sneakers</div>
-              <div class="online-status" style="color: var(--gold)">
-                In auction
-              </div>
-            </div>
-          </div>
-          <div class="online-user" onclick="openChatByName('Juan Dela Cruz')">
-            <div
-              class="online-avatar off"
-              style="background: linear-gradient(135deg, #4b5563, #374151)"
-            >
-              JD
-            </div>
-            <div>
-              <div class="online-name">Juan Dela Cruz</div>
-              <div class="online-status">Active 3h ago</div>
-            </div>
-          </div>
-          <div class="online-user" onclick="openChatByName('Ana Navarro')">
-            <div
-              class="online-avatar off"
-              style="background: linear-gradient(135deg, #ec4899, #8b5cf6)"
-            >
-              AN
-            </div>
-            <div>
-              <div class="online-name">Ana Navarro</div>
-              <div class="online-status">Active yesterday</div>
-            </div>
+        <div id="sidebarListings">
+          <div style="font-size: 12px; color: var(--muted2); padding: 8px">
+            Log in to see your listings.
           </div>
         </div>
         <div style="margin-top: 20px">
@@ -2657,7 +2833,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 padding: 8px;
                 font-size: 12px;
               "
-              onclick="toast('✅ Now following LuxuryMNL!', 'success')"
+              onclick="followUser('luxurymnl', 'LuxuryMNL')"
             >
               + Follow Seller
             </button>
@@ -2666,53 +2842,253 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
       </aside>
     </div>
 
-    <!-- CHAT POPUP -->
+    <!-- ══ CHAT POPUP ══ -->
     <div class="chat-popup" id="chatPopup">
       <div class="chat-header">
         <div
           class="chat-h-av"
           id="chatAv"
-          style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
+          style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
         >
-          MS
+          ??
         </div>
         <div>
-          <div class="chat-header-name" id="chatName">MariaSells</div>
-          <div class="chat-header-status" id="chatStat">Active now</div>
+          <div class="chat-header-name" id="chatName">Chat</div>
+          <div class="chat-header-status" id="chatStat">Active</div>
         </div>
         <div class="chat-close" onclick="closeChat()">✕</div>
       </div>
       <div class="chat-messages" id="chatMsgs"></div>
+      <div id="chatImgPreview" style="padding: 0 12px"></div>
       <div class="chat-input-row">
-        <input
-          class="chat-input"
-          id="chatIn"
-          placeholder="Type a message..."
-          onkeydown="if (event.key === 'Enter') sendMsg();"
-        />
-        <button class="chat-send" onclick="sendMsg()">➤</button>
+        <div class="chat-input-area">
+          <div class="chat-img-btn" title="Send image">
+            📎<input
+              type="file"
+              accept="image/*"
+              onchange="handleChatImageUpload(this)"
+            />
+          </div>
+          <input
+            class="chat-input"
+            id="chatIn"
+            placeholder="Type a message…"
+            onkeydown="if (event.key === 'Enter') sendMsg();"
+            oninput="handleChatTyping()"
+          />
+          <button class="chat-send" onclick="sendMsg()">➤</button>
+        </div>
       </div>
     </div>
 
-    <div class="chat-bubbles">
-      <div
-        class="chat-bubble"
-        onclick="openChatByName('MariaSells')"
-        style="background: linear-gradient(135deg, #f59e0b, #ea580c)"
-      >
-        MS
-        <div class="unread-dot">2</div>
-      </div>
-      <div
-        class="chat-bubble"
-        onclick="openChatByName('TechHub PH')"
-        style="background: linear-gradient(135deg, #7c3aed, #2563eb)"
-      >
-        TH
+    <!-- ══ CHAT HEADS ══ -->
+    <div class="chat-bubbles" id="chatHeads"></div>
+
+    <!-- ══ STORY VIEWER ══ -->
+    <div
+      class="story-viewer-overlay"
+      id="storyViewer"
+      onclick="if (event.target === this) closeStoryViewer();"
+    >
+      <div class="story-viewer-box">
+        <div class="sv-progress">
+          <div class="sv-progress-fill" id="svProgressFill"></div>
+        </div>
+        <div class="sv-header">
+          <div
+            id="svAvatar"
+            style="
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              background: linear-gradient(135deg, var(--blue), var(--gold));
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 700;
+              font-size: 14px;
+              color: #fff;
+              overflow: hidden;
+            "
+          >
+            ?
+          </div>
+          <div>
+            <div
+              style="font-weight: 700; font-size: 14px; color: #fff"
+              id="svUsername"
+            >
+              User
+            </div>
+            <div
+              style="font-size: 11px; color: rgba(255, 255, 255, 0.6)"
+              id="svTime"
+            >
+              just now
+            </div>
+          </div>
+        </div>
+        <div
+          id="svContent"
+          style="
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        ></div>
+        <div class="sv-reply">
+          <input id="svReplyInput" placeholder="Reply to story…" /><button
+            onclick="replyToStory()"
+          >
+            Send ↗
+          </button>
+        </div>
+        <button class="sv-nav sv-prev" onclick="prevStory()">‹</button>
+        <button class="sv-nav sv-next" onclick="nextStory()">›</button>
+        <button class="sv-close" onclick="closeStoryViewer()">✕</button>
       </div>
     </div>
 
-    <!-- POST MODAL -->
+    <!-- ══ POST STORY ══ -->
+    <div
+      class="modal-overlay"
+      id="postStoryModal"
+      onclick="if (event.target === this) closePostStory();"
+    >
+      <div class="modal" style="max-width: 420px">
+        <div class="modal-title">📖 Post a Story</div>
+        <div class="modal-sub">
+          Share a quick update — stories expire after 24h
+        </div>
+        <div class="upload-area" style="margin-bottom: 18px">
+          <input
+            type="file"
+            accept="image/*"
+            onchange="handleStoryImgUpload(this)"
+          />
+          <div class="upload-icon">📸</div>
+          <div class="upload-text">Upload story image (optional)</div>
+        </div>
+        <div id="storyImgPreview" style="text-align: center"></div>
+        <div class="form-group">
+          <label class="form-label">Caption / Text</label
+          ><textarea
+            class="form-textarea"
+            id="storyText"
+            style="min-height: 80px"
+            placeholder="What's happening with your listings?"
+          ></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" onclick="closePostStory()">Cancel</button
+          ><button class="btn-submit" onclick="submitStory()">
+            📤 Share Story
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ USER PROFILE MODAL ══ -->
+    <div
+      class="modal-overlay"
+      id="userProfileModal"
+      onclick="if (event.target === this) closeUserProfile();"
+    >
+      <div class="modal up-modal">
+        <div class="up-cover"></div>
+        <div class="up-avatar-wrap">
+          <div class="up-avatar-img" id="upAvatar">??</div>
+        </div>
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 16px;
+          "
+        >
+          <div>
+            <div
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-weight: 800;
+                font-size: 22px;
+              "
+              id="upUsername"
+            >
+              User
+            </div>
+            <div
+              style="color: var(--muted2); font-size: 13px; margin-top: 2px"
+              id="upHandle"
+            >
+              @user
+            </div>
+            <div
+              style="
+                font-size: 13px;
+                color: var(--muted2);
+                margin-top: 6px;
+                line-height: 1.5;
+              "
+              id="upBio"
+            >
+              Loading…
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-shrink: 0">
+            <button class="follow-btn" id="upFollowBtn">+ Follow</button>
+            <button class="btn-auth" id="upMsgBtn">💬 Message</button>
+          </div>
+        </div>
+        <div class="up-stats">
+          <div class="up-stat">
+            <div class="up-stat-num" id="upFollowers">—</div>
+            <div class="up-stat-label">Followers</div>
+          </div>
+          <div class="up-stat">
+            <div class="up-stat-num" id="upFollowing">—</div>
+            <div class="up-stat-label">Following</div>
+          </div>
+          <div class="up-stat">
+            <div class="up-stat-num" id="upListingCount">—</div>
+            <div class="up-stat-label">Listings</div>
+          </div>
+        </div>
+        <div
+          style="
+            font-family: &quot;Syne&quot;, sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 12px;
+          "
+        >
+          Active Listings
+        </div>
+        <div id="upListings" style="margin-bottom: 20px"></div>
+        <div
+          style="
+            font-family: &quot;Syne&quot;, sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 12px;
+          "
+        >
+          Reviews
+        </div>
+        <div id="upReviews"></div>
+        <button
+          class="btn-cancel"
+          style="width: 100%; text-align: center; margin-top: 16px"
+          onclick="closeUserProfile()"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ POST AUCTION MODAL ══ -->
     <div
       class="modal-overlay"
       id="postModal"
@@ -2732,9 +3108,9 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
           />
           <div class="upload-icon" id="upIcon">📸</div>
           <div class="upload-text" id="upText">
-            Click to upload photos (up to 10 images)<br /><span
+            Click to upload photos (up to 5 images)<br /><span
               style="color: var(--muted); font-size: 12px"
-              >JPG, PNG, WebP · Max 10MB each</span
+              >JPG, PNG, WebP · Max 5MB each</span
             >
           </div>
         </div>
@@ -2752,7 +3128,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
             ><textarea
               class="form-textarea"
               id="pDesc"
-              placeholder="Describe condition, accessories, defects..."
+              placeholder="Describe condition, accessories, defects…"
             ></textarea>
           </div>
           <div class="form-row">
@@ -2766,6 +3142,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 <option>Cameras</option>
                 <option>Watches</option>
                 <option>Collectibles</option>
+                <option>Other</option>
               </select>
             </div>
             <div class="form-group">
@@ -2786,6 +3163,7 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 id="pBid"
                 type="number"
                 placeholder="0"
+                min="1"
               />
             </div>
             <div class="form-group">
@@ -2795,41 +3173,44 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
                 id="pBuyNow"
                 type="number"
                 placeholder="Optional"
+                min="1"
               />
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Auction Duration</label
-            ><select class="form-select" id="pDur">
-              <option>1 hour</option>
-              <option>3 hours</option>
-              <option>6 hours</option>
-              <option>12 hours</option>
-              <option>1 day</option>
-              <option>3 days</option>
-              <option>7 days</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Shipping</label
-            ><select class="form-select" id="pShip">
-              <option>Free Shipping (Metro Manila)</option>
-              <option>Buyer Pays Shipping</option>
-              <option>Meet Up Only</option>
-              <option>Shipping PH-wide</option>
-            </select>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Auction Duration</label
+              ><select class="form-select" id="pDuration">
+                <option value="3600">1 hour</option>
+                <option value="10800">3 hours</option>
+                <option value="21600">6 hours</option>
+                <option value="43200">12 hours</option>
+                <option value="86400" selected>1 day</option>
+                <option value="259200">3 days</option>
+                <option value="604800">7 days</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shipping</label
+              ><select class="form-select" id="pShip">
+                <option>Free Shipping (Metro Manila)</option>
+                <option>Buyer Pays Shipping</option>
+                <option>Meet Up Only</option>
+                <option>Shipping PH-wide</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-          <button class="btn-submit" onclick="submitPost()">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button
+          ><button class="btn-submit" onclick="submitPost()">
             🚀 Post Auction
           </button>
         </div>
       </div>
     </div>
 
-    <!-- WALLET MODAL -->
+    <!-- ══ WALLET MODAL ══ -->
     <div
       class="modal-overlay"
       id="walletModal"
@@ -2845,22 +3226,127 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
             id="wmAmt"
             type="number"
             placeholder="Enter amount"
+            min="1"
           />
         </div>
-        <!-- Dynamic payment method select -->
         <div id="wmMethodWrap"></div>
-        <!-- Dynamic extra fields based on method -->
         <div id="wmExtra"></div>
         <div class="modal-footer">
-          <button class="btn-cancel" onclick="closeWM()">Cancel</button>
-          <button class="btn-submit" id="wmBtn" onclick="processWallet()">
+          <button class="btn-cancel" onclick="closeWM()">Cancel</button
+          ><button class="btn-submit" id="wmBtn" onclick="processWallet()">
             Confirm
           </button>
         </div>
       </div>
     </div>
 
-    <!-- CONFIRM DIALOG -->
+    <!-- ══ AUTH MODAL ══ -->
+    <div
+      class="modal-overlay"
+      id="authModal"
+      onclick="if (event.target === this) closeAuthModal();"
+    >
+      <div class="modal" style="max-width: 420px">
+        <div class="modal-title" id="authModalTitle">Welcome to BiliBid 🏷️</div>
+        <div class="modal-sub" id="authModalSub">
+          Join the Philippines' #1 social auction marketplace.
+        </div>
+        <div class="auth-tabs">
+          <div
+            class="auth-tab active"
+            id="authTabLogin"
+            onclick="switchAuthTab('login')"
+          >
+            Log In
+          </div>
+          <div
+            class="auth-tab"
+            id="authTabRegister"
+            onclick="switchAuthTab('register')"
+          >
+            Sign Up
+          </div>
+        </div>
+        <div id="loginForm">
+          <div class="form-group">
+            <label class="form-label">Email</label
+            ><input
+              class="form-input"
+              id="loginEmail"
+              type="email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label
+            ><input
+              class="form-input"
+              id="loginPassword"
+              type="password"
+              placeholder="••••••••"
+              onkeydown="if (event.key === 'Enter') submitLogin();"
+            />
+          </div>
+          <button
+            class="btn-submit"
+            style="width: 100%; margin-top: 4px"
+            onclick="submitLogin()"
+          >
+            🔑 Log In
+          </button>
+        </div>
+        <div id="registerForm" style="display: none">
+          <div class="form-group">
+            <label class="form-label">Username</label
+            ><input
+              class="form-input"
+              id="regUsername"
+              placeholder="e.g. mariasells"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label
+            ><input
+              class="form-input"
+              id="regEmail"
+              type="email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label"
+              >Password
+              <span style="color: var(--muted); font-weight: 400"
+                >(min 6 chars)</span
+              ></label
+            ><input
+              class="form-input"
+              id="regPassword"
+              type="password"
+              placeholder="••••••••"
+              onkeydown="if (event.key === 'Enter') submitRegister();"
+            />
+          </div>
+          <button
+            class="btn-submit"
+            style="width: 100%; margin-top: 4px"
+            onclick="submitRegister()"
+          >
+            🚀 Create Account
+          </button>
+        </div>
+        <div class="auth-divider">— or —</div>
+        <button
+          class="btn-cancel"
+          style="width: 100%; text-align: center"
+          onclick="closeAuthModal()"
+        >
+          Continue as Guest
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ CONFIRM ══ -->
     <div class="confirm-overlay" id="confirmOverlay">
       <div class="confirm-box">
         <div class="confirm-icon" id="cfIcon">❓</div>
@@ -2878,6 +3364,76 @@ Selling quality items at fair prices. Trusted seller since 2022. 🇵🇭</texta
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <!-- ══ SCRIPTS ══ -->
+    <script src="https://bilibid-1.onrender.com/socket.io/socket.io.js"></script>
     <script src="BiliBid2.js"></script>
+    <script>
+      /* ── Auth modal helpers ── */
+      function openAuthModal(tab) {
+        switchAuthTab(tab || "login");
+        document.getElementById("authModal").classList.add("open");
+      }
+      function closeAuthModal() {
+        document.getElementById("authModal").classList.remove("open");
+      }
+      function switchAuthTab(tab) {
+        document.getElementById("loginForm").style.display =
+          tab === "login" ? "" : "none";
+        document.getElementById("registerForm").style.display =
+          tab === "register" ? "" : "none";
+        document
+          .getElementById("authTabLogin")
+          .classList.toggle("active", tab === "login");
+        document
+          .getElementById("authTabRegister")
+          .classList.toggle("active", tab === "register");
+      }
+      async function submitLogin() {
+        const email = document.getElementById("loginEmail").value.trim();
+        const password = document.getElementById("loginPassword").value;
+        if (!email || !password) {
+          toast("⚠️ Enter email and password", "error");
+          return;
+        }
+        const ok = await login(email, password);
+        if (ok) closeAuthModal();
+      }
+      async function submitRegister() {
+        const username = document.getElementById("regUsername").value.trim();
+        const email = document.getElementById("regEmail").value.trim();
+        const password = document.getElementById("regPassword").value;
+        if (!username || !email || !password) {
+          toast("⚠️ All fields required", "error");
+          return;
+        }
+        const ok = await register(username, email, password);
+        if (ok) closeAuthModal();
+      }
+
+      /* ── Wrap auth functions to sync UI ── */
+      const _origLogin = window.login;
+      const _origRegister = window.register;
+      const _origLogout = window.logout;
+
+      window.login = async (e, p) => {
+        const r = await _origLogin(e, p);
+        syncUIToAuthState();
+        return r;
+      };
+      window.register = async (u, e, p) => {
+        const r = await _origRegister(u, e, p);
+        syncUIToAuthState();
+        return r;
+      };
+      window.logout = () => {
+        _origLogout();
+        syncUIToAuthState();
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (typeof syncUIToAuthState === "function") syncUIToAuthState();
+      });
+    </script>
   </body>
 </html>
