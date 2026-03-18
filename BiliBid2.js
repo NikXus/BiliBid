@@ -1,16 +1,7 @@
 // ============================================================
-//  BiliBid2.js  v4.0  — All 404s fixed, Socket messaging fixed
-//
-//  FIXES APPLIED:
-//  1. /api/stories        → now exists in backend (Story model + routes)
-//  2. /api/messages       → backend now registers both /messages AND
-//                           /messages/conversations
-//  3. /api/reviews/:id    → backend now supports POST /api/reviews/:userId
-//  4. /api/notifications/:id/read → backend now has PUT /:id/read route
-//  5. /api/users/upload-avatar    → new route added to backend
-//  6. Socket "sendMessage" → backend now relays to receiver room
-//  7. Socket typing relay  → backend now forwards typing events
-//  8. Socket online status → backend now broadcasts userOnline/userOffline
+//  BiliBid2.js  v5.0
+//  Fixes: guest mode, photo collage, buy-now feed removal,
+//  real suggested sellers, messaging usernames, logout reset
 // ============================================================
 "use strict";
 
@@ -30,13 +21,11 @@ function setAuth(token, id, username, avatar = "") {
   localStorage.setItem("bbUsername", username);
   localStorage.setItem("bbAvatar", avatar);
 }
-
 function clearAuth() {
   ["bbToken", "bbUserId", "bbUsername", "bbAvatar"].forEach((k) =>
     localStorage.removeItem(k),
   );
 }
-
 const authHeaders = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${getToken()}`,
@@ -65,18 +54,18 @@ async function apiFetch(path, opts = {}) {
     return data;
   } catch (err) {
     console.error("[apiFetch]", url, err.message);
-    toast("⚠️ Network error. Please check your connection.", "error");
+    toast("⚠️ Network error. Check your connection.", "error");
     return null;
   }
 }
 
-/* ── 4. SOCKET.IO — FIXED ── */
+/* ── 4. SOCKET.IO ── */
 let socket = null;
 let onlineUsers = {};
 
 function initSocket() {
   if (typeof io === "undefined") {
-    console.warn("[Socket] Socket.io not loaded");
+    console.warn("[Socket] Not loaded");
     return;
   }
   if (socket) {
@@ -85,7 +74,6 @@ function initSocket() {
   }
 
   socket = io(SOCKET_URL, {
-    // FIX: Don't send auth token here — just use join event after connect
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -97,33 +85,23 @@ function initSocket() {
   socket.on("connect", () => {
     console.log("[Socket] Connected:", socket.id);
     const uid = getUserId();
-    if (uid) {
-      socket.emit("join", uid);
-    }
+    if (uid) socket.emit("join", uid);
   });
-
   socket.on("disconnect", (reason) => {
-    console.warn("[Socket] Disconnected:", reason);
-    // Only force reconnect on server-initiated disconnects
-    if (reason === "io server disconnect") {
+    if (reason === "io server disconnect")
       setTimeout(() => socket.connect(), 1000);
-    }
   });
-
   socket.on("connect_error", (err) =>
     console.error("[Socket] Error:", err.message),
   );
 
-  /* ── Bid broadcast ── */
   socket.on("bidPlaced", ({ auctionId, currentBid, bidderName, bids }) => {
     const baEl = document.getElementById(`ba-${auctionId}`);
     const bcEl = document.getElementById(`bc-${auctionId}`);
     if (baEl) baEl.textContent = "₱" + Number(currentBid).toLocaleString();
     if (bcEl) bcEl.textContent = (bids || 0) + " bids";
-
     const post = cachedPosts.find((p) => p._id === auctionId);
     if (post) post.currentBid = currentBid;
-
     if (bidderName !== getUsername())
       toast(
         `🔥 ${bidderName} bid ₱${Number(currentBid).toLocaleString()}!`,
@@ -131,9 +109,24 @@ function initSocket() {
       );
   });
 
-  /* ── New auction broadcast ── */
+  /* Remove bought auction from everyone's feed */
+  socket.on("auctionEnded", ({ auctionId, reason, buyerName }) => {
+    const idx = cachedPosts.findIndex((p) => p._id === auctionId);
+    if (idx !== -1) {
+      cachedPosts.splice(idx, 1);
+      const el = document.getElementById(auctionId);
+      if (el) {
+        el.style.transition = "opacity .4s";
+        el.style.opacity = "0";
+        setTimeout(() => el.remove(), 400);
+      }
+    }
+    if (reason === "buynow" && buyerName !== getUsername())
+      toast(`⚡ ${buyerName} bought an item!`, "info");
+  });
+
   socket.on("auctionCreated", (auction) => {
-    if (auction.sellerId !== getUserId()) {
+    if (auction.sellerId !== getUserId() && getToken()) {
       cachedPosts.unshift(auction);
       timers[auction._id] = Math.max(
         0,
@@ -144,32 +137,28 @@ function initSocket() {
     }
   });
 
-  /*
-   * FIX: "newMessage" handler updated to use correct field names
-   * matching what the backend now sends: senderId (string), senderName
-   */
   socket.on("newMessage", (msg) => {
     const myId = getUserId();
-    // Normalise senderId — could be ObjectId object or plain string
     const senderIdStr = msg.senderId?._id
       ? msg.senderId._id.toString()
       : String(msg.senderId || "");
-
-    if (senderIdStr === myId) return; // own echo
+    if (senderIdStr === myId) return;
 
     if (currentChatUserId === senderIdStr) {
-      // Chat window with this person is open → append message
       const content =
         msg.messageType === "image"
           ? `<img src="${IMAGE_BASE}${msg.imageUrl}" class="chat-img-preview" onclick="openImg('${IMAGE_BASE}${msg.imageUrl}')">`
           : escapeHtml(msg.message);
-      appendChatMsg("them", content, fmtTime(msg.createdAt), msg.senderName);
+      appendChatMsg(
+        "them",
+        content,
+        fmtTime(msg.createdAt),
+        msg.senderName || "User",
+      );
     } else {
-      // Update or add chat head
       const win = chatWindows.find((w) => w.userId === senderIdStr);
-      if (win) {
-        win.unread = (win.unread || 0) + 1;
-      } else {
+      if (win) win.unread = (win.unread || 0) + 1;
+      else
         chatWindows.push({
           userId: senderIdStr,
           username: msg.senderName || "User",
@@ -177,48 +166,33 @@ function initSocket() {
           color: rndColor(),
           avatar: msg.senderAvatar || "",
         });
-      }
       renderChatHeads();
       toast(
         `💬 ${msg.senderName || "Someone"}: ${msg.message || "[Image]"}`,
         "info",
       );
     }
-
     addNotifLocal(
       "💬",
       `New message from ${msg.senderName || "User"}`,
       `chat:${senderIdStr}`,
     );
-
-    if (
-      document.getElementById("page-messages")?.classList.contains("active")
-    ) {
+    if (document.getElementById("page-messages")?.classList.contains("active"))
       loadConversations();
-    }
   });
 
-  /*
-   * FIX: messageSent echo — confirms the socket send worked
-   * (only needed for cross-tab awareness, safe to ignore)
-   */
-  socket.on("messageSent", (msg) => {
-    console.log("[Socket] Message delivered:", msg._id);
-  });
-
-  socket.on("messageError", ({ error }) => {
-    toast("⚠️ Message failed: " + error, "error");
-  });
-
-  /* ── Typing ── */
+  socket.on("messageSent", (msg) =>
+    console.log("[Socket] Delivered:", msg._id),
+  );
+  socket.on("messageError", ({ error }) =>
+    toast("⚠️ Message failed: " + error, "error"),
+  );
   socket.on("typing", ({ from, username }) => {
     if (from === currentChatUserId) showTyping(username);
   });
   socket.on("stopTyping", ({ from }) => {
     if (from === currentChatUserId) hideTyping();
   });
-
-  /* ── Online status ── */
   socket.on("userOnline", (uid) => {
     onlineUsers[uid] = true;
     updateOnlineIndicators();
@@ -270,33 +244,33 @@ function updateChatHeadStatus(uid, online) {
 }
 
 /* ── 5. GLOBAL STATE ── */
-let walletBal = 0;
-let confirmCb = null;
-let walletType = "";
-let feedFilter = "all";
-let likedPosts = {};
-let watchedPosts = {};
-let notifCount = 0;
-let notifs = [];
-let cachedPosts = [];
-let watchItems = [];
-let wonItems = [];
-let txList = [];
+let walletBal = 0,
+  confirmCb = null,
+  walletType = "",
+  feedFilter = "all";
+let likedPosts = {},
+  watchedPosts = {},
+  notifCount = 0,
+  notifs = [];
+let cachedPosts = [],
+  watchItems = [],
+  wonItems = [],
+  txList = [];
 let myListings = { active: [], ended: [], sold: [] };
-let currentChatUserId = "";
-let currentChatUsername = "";
-let myProfile = {};
-let uploadedImageUrls = [];
-let timers = {};
-let stories = [];
-let currentStoryIdx = 0;
-let storyTimer = null;
-let uploadedStoryUrl = "";
-let chatWindows = [];
-let followedUsers = {};
-let isTyping = false;
-let chatTypingTimer = null;
-let uploadedAvatarUrl = "";
+let currentChatUserId = "",
+  currentChatUsername = "",
+  myProfile = {};
+let uploadedImageUrls = [],
+  timers = {},
+  stories = [],
+  currentStoryIdx = 0;
+let storyTimer = null,
+  uploadedStoryUrl = "",
+  chatWindows = [],
+  followedUsers = {};
+let isTyping = false,
+  chatTypingTimer = null,
+  uploadedAvatarUrl = "";
 
 /* ── 6. HELPERS ── */
 const pad = (n) => String(n).padStart(2, "0");
@@ -370,8 +344,8 @@ setInterval(() => {
     if (timers[p._id] > 0) timers[p._id]--;
     const el = document.getElementById("tmr-" + p._id);
     if (!el) return;
-    const t = timers[p._id];
-    const h = Math.floor(t / 3600),
+    const t = timers[p._id],
+      h = Math.floor(t / 3600),
       m = Math.floor((t % 3600) / 60),
       s = t % 60;
     el.innerHTML =
@@ -389,11 +363,8 @@ function navigate(page) {
   document
     .querySelectorAll(".nav-item")
     .forEach((n) => n.classList.remove("active"));
-  const pg = document.getElementById("page-" + page);
-  if (pg) pg.classList.add("active");
-  const nv = document.getElementById("nav-" + page);
-  if (nv) nv.classList.add("active");
-
+  document.getElementById("page-" + page)?.classList.add("active");
+  document.getElementById("nav-" + page)?.classList.add("active");
   const loaders = {
     feed: loadFeed,
     "my-auctions": () => loadMyAuctions("active"),
@@ -410,54 +381,29 @@ function navigate(page) {
 
 /* ── 9. STORIES ── */
 async function loadStories() {
-  // FIX: /api/stories now exists — no more 404
+  if (!getToken()) {
+    stories = [];
+    renderStoriesBar();
+    return;
+  }
   const data = await apiFetch("/stories");
-  stories = Array.isArray(data) ? data : getDemoStories();
+  stories = Array.isArray(data) ? data : [];
   renderStoriesBar();
-}
-
-function getDemoStories() {
-  return [
-    {
-      _id: "s1",
-      username: "TechHub",
-      text: "📱 New iPhone deals!",
-      isLive: true,
-      createdAt: new Date(),
-    },
-    {
-      _id: "s2",
-      username: "SneakersPH",
-      text: "👟 Jordan drop tonight!",
-      isLive: true,
-      createdAt: new Date(),
-    },
-    {
-      _id: "s3",
-      username: "GadgetPH",
-      text: "💻 MacBook sale!",
-      isLive: false,
-      createdAt: new Date(),
-    },
-    {
-      _id: "s4",
-      username: "LuxuryMNL",
-      text: "👜 Bags & watches",
-      isLive: false,
-      createdAt: new Date(),
-    },
-  ];
 }
 
 function renderStoriesBar() {
   const bar = document.getElementById("storiesBar");
   if (!bar) return;
+  if (!getToken()) {
+    bar.innerHTML = "";
+    return;
+  }
+
   const myStory = `<div class="story-item" onclick="openPostStory()">
     <div class="story-ring" style="background:var(--surface3);padding:2px">
       <div class="story-inner" style="background:linear-gradient(135deg,var(--blue),var(--accent));font-size:28px">＋</div>
-    </div>
-    <div class="story-name">Your Story</div>
-  </div>`;
+    </div><div class="story-name">Your Story</div></div>`;
+
   const items = stories
     .map((s, i) => {
       const av = (s.username || "U").slice(0, 2).toUpperCase();
@@ -480,13 +426,11 @@ function openStory(i) {
   if (!s) return;
   const viewer = document.getElementById("storyViewer");
   if (!viewer) return;
-
   document.getElementById("svUsername").textContent = s.username || "User";
   document.getElementById("svTime").textContent = timeAgo(s.createdAt);
   document.getElementById("svAvatar").textContent = (s.username || "U")
     .slice(0, 2)
     .toUpperCase();
-
   const cnt = document.getElementById("svContent");
   if (cnt) {
     if (s.imageUrl)
@@ -494,7 +438,6 @@ function openStory(i) {
     else
       cnt.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:300px;font-size:22px;color:var(--text);text-align:center;padding:40px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(245,158,11,.1));border-radius:20px;border:1px solid var(--border)">${escapeHtml(s.text || "")}</div>`;
   }
-
   document.getElementById("svReplyInput").value = "";
   viewer.classList.add("open");
   startStoryProgress();
@@ -516,7 +459,6 @@ function startStoryProgress() {
   if (storyTimer) clearTimeout(storyTimer);
   storyTimer = setTimeout(() => nextStory(), 5200);
 }
-
 function nextStory() {
   currentStoryIdx < stories.length - 1
     ? openStory(currentStoryIdx + 1)
@@ -569,7 +511,6 @@ function closePostStory() {
   const pi = document.getElementById("storyImgPreview");
   if (pi) pi.innerHTML = "";
 }
-
 async function handleStoryImgUpload(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -591,7 +532,6 @@ async function handleStoryImgUpload(input) {
     toast("⚠️ Image upload failed", "error");
   }
 }
-
 async function submitStory() {
   const text = document.getElementById("storyText")?.value?.trim() || "";
   if (!text && !uploadedStoryUrl) {
@@ -625,8 +565,25 @@ async function submitStory() {
 /* ── 10. FEED ── */
 async function loadFeed() {
   const c = document.getElementById("postsContainer");
-  if (c) c.innerHTML = '<div class="loading-state">Loading auctions…</div>';
 
+  /* Guest mode: show login prompt, no auctions */
+  if (!getToken()) {
+    cachedPosts = [];
+    if (c)
+      c.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px;color:var(--muted2)">
+      <div style="font-size:52px;margin-bottom:16px">🏷️</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--text);margin-bottom:8px">Discover Live Auctions</div>
+      <div style="font-size:14px;margin-bottom:24px;max-width:320px;margin-left:auto;margin-right:auto">Log in to browse deals, place bids, and buy items from sellers across the Philippines.</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn-auth" onclick="openAuthModal('login')">🔑 Log In</button>
+        <button class="btn-auth primary" onclick="openAuthModal('register')">🚀 Sign Up Free</button>
+      </div>
+    </div>`;
+    await loadStories();
+    return;
+  }
+
+  if (c) c.innerHTML = '<div class="loading-state">Loading auctions…</div>';
   let path = "/auctions?status=active";
   if (
     feedFilter !== "all" &&
@@ -658,10 +615,8 @@ async function loadFeed() {
       );
   });
 
-  if (getToken()) {
-    const wl = await apiFetch("/watchlist");
-    if (Array.isArray(wl)) wl.forEach((w) => (watchedPosts[w._id] = true));
-  }
+  const wl = await apiFetch("/watchlist");
+  if (Array.isArray(wl)) wl.forEach((w) => (watchedPosts[w._id] = true));
 
   renderFeed();
   await loadStories();
@@ -681,6 +636,49 @@ function renderFeed() {
   c.innerHTML = cachedPosts.map(buildPost).join("");
 }
 
+/* ── Photo collage builder ── */
+function buildPhotoCollage(images, auctionId) {
+  if (!images?.length)
+    return `<span style="font-size:64px;line-height:240px">🏷️</span>`;
+
+  const srcs = images
+    .slice(0, 5)
+    .map((s) => (s.startsWith("http") ? s : `${IMAGE_BASE}${s}`));
+  const n = srcs.length;
+  const extra = images.length - 5;
+  const openFn = (src) => `onclick="openImg('${src}')"`;
+  const img = (src, style = "") =>
+    `<img src="${src}" ${openFn(src)} style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;${style}" onerror="this.style.display='none'">`;
+
+  if (n === 1) return img(srcs[0]);
+
+  if (n === 2)
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;height:240px;gap:2px">
+    ${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}
+  </div>`;
+
+  if (n === 3)
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px">
+    <div style="grid-row:span 2;overflow:hidden">${img(srcs[0])}</div>
+    <div style="overflow:hidden">${img(srcs[1])}</div>
+    <div style="overflow:hidden">${img(srcs[2])}</div>
+  </div>`;
+
+  if (n === 4)
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px">
+    ${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}
+  </div>`;
+
+  // 5+
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:140px 100px;height:240px;gap:2px">
+    <div style="grid-column:span 2;overflow:hidden">${img(srcs[0])}</div>
+    <div style="overflow:hidden">${img(srcs[1])}</div>
+    <div style="overflow:hidden">${img(srcs[2])}</div>
+    <div style="overflow:hidden">${img(srcs[3])}</div>
+    <div style="overflow:hidden;position:relative">${img(srcs[4])}${extra > 0 ? `<div ${openFn(srcs[4])} style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:800;cursor:zoom-in">+${extra}</div>` : ""}</div>
+  </div>`;
+}
+
 function buildPost(p) {
   const bid = p.currentBid || p.startingPrice || 0;
   const bids = p.bids?.length || 0;
@@ -698,14 +696,7 @@ function buildPost(p) {
       : 0;
   const comments = p.comments || [];
 
-  let imgEl = '<span style="font-size:64px">🏷️</span>';
-  if (p.images?.length) {
-    const src = p.images[0].startsWith("http")
-      ? p.images[0]
-      : `${IMAGE_BASE}${p.images[0]}`;
-    imgEl = `<img src="${src}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`;
-  }
-
+  const collage = buildPhotoCollage(p.images, p._id);
   const avContent = p.sellerAvatar
     ? `<img src="${IMAGE_BASE}${p.sellerAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
     : (p.sellerName || "S").slice(0, 2).toUpperCase();
@@ -735,9 +726,9 @@ function buildPost(p) {
       </div>
     </div>
 
-    <div class="post-product-img" onclick="openImg('${p.images?.[0] ? (p.images[0].startsWith("http") ? p.images[0] : IMAGE_BASE + p.images[0]) : ""}')">
-      ${imgEl}
-      ${ending ? '<div class="img-overlay"><div class="live-dot"></div>Ending Soon!</div>' : ""}
+    <div class="post-product-img" style="height:auto;min-height:${p.images?.length > 1 ? "auto" : "240px"}">
+      ${collage}
+      ${ending ? '<div class="img-overlay" style="position:absolute;top:12px;right:12px"><div class="live-dot"></div>Ending Soon!</div>' : ""}
     </div>
 
     <div class="post-body">
@@ -750,7 +741,6 @@ function buildPost(p) {
           .join("")}
         ${p.shipping ? `<span class="tag">🚚 ${escapeHtml(p.shipping)}</span>` : ""}
       </div>
-
       <div class="bid-section">
         <div class="bid-row">
           <div>
@@ -772,7 +762,6 @@ function buildPost(p) {
           ${ending ? "⚠️ Ending very soon!" : "Starting: ₱" + (p.startingPrice || 0).toLocaleString()}
         </div>
       </div>
-
       <div class="bid-input-row" style="margin-top:14px">
         <input class="bid-input" type="number" id="bi-${p._id}" placeholder="Min ₱${(bid + 100).toLocaleString()}">
         <button class="bid-btn${ending ? " gold-btn" : ""}" onclick="placeBid('${p._id}')">🔥 ${ending ? "⚡ Bid NOW!" : "Place Bid"}</button>
@@ -801,9 +790,8 @@ function buildPost(p) {
 }
 
 function buildCommentHtml(c) {
-  const av = (c.username || "U").slice(0, 2).toUpperCase();
   return `<div class="comment-item">
-    <div class="comment-av" style="background:${hashColor(c.username || "")}">${escapeHtml(av)}</div>
+    <div class="comment-av" style="background:${hashColor(c.username || "")}">${escapeHtml((c.username || "U").slice(0, 2).toUpperCase())}</div>
     <div class="comment-bubble">
       <div class="comment-author">${escapeHtml(c.username || "User")}</div>
       <div class="comment-text">${escapeHtml(c.text)}</div>
@@ -918,10 +906,19 @@ async function buyNow(pid, price) {
         method: "POST",
         body: JSON.stringify({ price }),
       });
-      if (res?.message && !res.auction) {
+      if (!res) return;
+      if (res.message && !res.auction) {
         toast("⚠️ " + res.message, "error");
         return;
       }
+
+      /* Remove from local feed immediately */
+      const idx = cachedPosts.findIndex((p) => p._id === pid);
+      if (idx !== -1) {
+        cachedPosts.splice(idx, 1);
+        renderFeed();
+      }
+
       toast("🎉 Purchased! Check Won Auctions.", "success");
       walletBal = Math.max(0, walletBal - price);
       syncWalletDisplay();
@@ -940,8 +937,7 @@ async function doLike(pid) {
   likedPosts[pid] = res.liked;
   const lcEl = document.getElementById("lc-" + pid);
   if (lcEl) lcEl.textContent = res.likeCount;
-  const btn = document.getElementById("like-" + pid);
-  if (btn) btn.className = "post-action" + (res.liked ? " liked" : "");
+  document.getElementById("like-" + pid)?.classList.toggle("liked", res.liked);
   toast(res.liked ? "❤️ Liked!" : "💔 Unliked", "info");
 }
 
@@ -1043,10 +1039,8 @@ async function followUser(userId, username) {
     toast("⚠️ You cannot follow yourself", "error");
     return false;
   }
-  const isFollowing = followedUsers[userId];
-  // FIX: Use POST for both follow and unfollow — backend handles toggle
   const res = await apiFetch(`/users/${userId}/follow`, { method: "POST" });
-  if (res === null) return isFollowing; // network error
+  if (res === null) return followedUsers[userId];
   followedUsers[userId] = res.following;
   toast(
     res.following ? `✅ Now following ${username}!` : `Unfollowed ${username}`,
@@ -1086,7 +1080,6 @@ async function openUserProfile(userId, username) {
       followBtn.style.background = nowFollowing ? "var(--surface3)" : "";
     };
   }
-
   const msgBtn = document.getElementById("upMsgBtn");
   if (msgBtn)
     msgBtn.onclick = () => {
@@ -1118,13 +1111,11 @@ async function openUserProfile(userId, username) {
       userData.followingCount || 0;
     document.getElementById("upListingCount").textContent =
       userData.listingsCount || 0;
-
     if (userData.avatar) {
       const avEl = document.getElementById("upAvatar");
       if (avEl)
         avEl.innerHTML = `<img src="${IMAGE_BASE}${userData.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
     }
-
     if (userData.isFollowing !== undefined) {
       followedUsers[userId] = userData.isFollowing;
       if (followBtn) {
@@ -1156,8 +1147,11 @@ async function openUserProfile(userId, username) {
   }
 
   const reviews = revData?.reviews || [];
-  const avg = parseFloat(revData?.averageRating) || 0;
-  renderUserProfileReviews(userId, reviews, avg);
+  renderUserProfileReviews(
+    userId,
+    reviews,
+    parseFloat(revData?.averageRating) || 0,
+  );
 }
 
 function renderUserProfileReviews(targetUserId, reviews, avg) {
@@ -1166,11 +1160,11 @@ function renderUserProfileReviews(targetUserId, reviews, avg) {
   const stars = (n) =>
     "⭐".repeat(Math.round(n)) + "☆".repeat(Math.max(0, 5 - Math.round(n)));
   let html = "";
-  if (avg > 0) {
-    html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;background:var(--surface2);border-radius:12px;padding:12px;border:1px solid var(--border)">
-      <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:32px;color:var(--gold)">${avg.toFixed(1)}</div>
-      <div style="font-size:14px">${stars(avg)}</div><div style="font-size:11px;color:var(--muted2)">${reviews.length} reviews</div></div></div>`;
-  }
+  if (avg > 0)
+    html += `<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:14px;border:1px solid var(--border);text-align:center">
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:32px;color:var(--gold)">${avg.toFixed(1)}</div>
+    <div style="font-size:14px">${stars(avg)}</div><div style="font-size:11px;color:var(--muted2)">${reviews.length} reviews</div></div>`;
+
   if (!reviews.length)
     html +=
       '<div style="color:var(--muted2);font-size:13px;text-align:center;padding:16px">No reviews yet.</div>';
@@ -1204,7 +1198,7 @@ function renderUserProfileReviews(targetUserId, reviews, avg) {
 }
 
 let reviewRating = 0;
-function setReviewRating(n, userId) {
+function setReviewRating(n) {
   reviewRating = n;
   for (let i = 1; i <= 5; i++) {
     const el = document.getElementById("rstar-" + i);
@@ -1222,13 +1216,12 @@ async function submitReview(userId) {
     toast("⚠️ Add a comment", "error");
     return;
   }
-  // FIX: call POST /api/reviews/:userId (backend now supports this path)
   const res = await apiFetch(`/reviews/${userId}`, {
     method: "POST",
     body: JSON.stringify({ rating: reviewRating, comment }),
   });
   if (res) {
-    toast("⭐ Review submitted! Thank you.", "success");
+    toast("⭐ Review submitted!", "success");
     reviewRating = 0;
     openUserProfile(
       userId,
@@ -1295,8 +1288,7 @@ function renderMyAuct(tab) {
   if (!c) return;
   if (!items.length) {
     c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)">
-      <div style="font-size:48px;margin-bottom:12px">📦</div>
-      <div>No ${tab} listings yet.</div>
+      <div style="font-size:48px;margin-bottom:12px">📦</div><div>No ${tab} listings yet.</div>
       <button class="btn-submit" style="margin-top:16px" onclick="openModal()">＋ Post Auction</button>
     </div>`;
     return;
@@ -1309,13 +1301,13 @@ function renderMyAuct(tab) {
       let actions = "";
       if (tab === "active")
         actions = `<button class="listing-action-btn" onclick="editAuction('${item._id}')">✏️ Edit</button>
-                 <button class="listing-action-btn" onclick="toast('📊 ${bidCnt} bids on this item','info')">📊 ${bidCnt} Bids</button>
-                 <button class="listing-action-btn danger" onclick="deleteAuction('${item._id}',${i})">🗑️ Delete</button>`;
+      <button class="listing-action-btn" onclick="toast('📊 ${bidCnt} bids on this item','info')">📊 ${bidCnt} Bids</button>
+      <button class="listing-action-btn danger" onclick="deleteAuction('${item._id}',${i})">🗑️ Delete</button>`;
       else if (tab === "ended")
         actions = `<button class="listing-action-btn" onclick="openModal()">🔄 Relist</button>`;
       else
         actions = `<button class="listing-action-btn" onclick="openTracking('${item._id}')">📦 Track</button>
-                 <button class="listing-action-btn" onclick="openUserProfile('${item.winnerId || ""}','${escapeHtml(item.winnerName || "Winner")}')">⭐ Review Buyer</button>`;
+      <button class="listing-action-btn" onclick="openUserProfile('${item.winnerId || ""}','${escapeHtml(item.winnerName || "Winner")}')">⭐ Review Buyer</button>`;
       return `<div class="card" style="display:flex;gap:14px;align-items:center;padding:14px">
       <div style="width:56px;height:56px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden">
         ${item.images?.length ? `<img src="${item.images[0].startsWith("http") ? item.images[0] : IMAGE_BASE + item.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
@@ -1487,9 +1479,7 @@ function renderWon() {
   const c = document.getElementById("wonContent");
   if (!c) return;
   if (!wonItems.length) {
-    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)">
-      <div style="font-size:48px;margin-bottom:12px">🏆</div><div>No won auctions yet. Keep bidding!</div>
-    </div>`;
+    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">🏆</div><div>No won auctions yet. Keep bidding!</div></div>`;
     return;
   }
   c.innerHTML = wonItems
@@ -1539,13 +1529,10 @@ const NOTIF_ICONS = {
 function handleNotifClick(n) {
   markRead(n._id || n.id);
   const link = n.link || "";
-  if (link.startsWith("chat:")) {
+  if (link.startsWith("chat:"))
     openChatPopup(link.replace("chat:", ""), n.senderName || "User");
-  } else if (link.startsWith("http")) {
-    window.location.href = link;
-  } else if (link) {
-    navigate(link);
-  }
+  else if (link.startsWith("http")) window.location.href = link;
+  else if (link) navigate(link);
 }
 
 function renderNotifs() {
@@ -1602,7 +1589,6 @@ function markRead(id) {
         ?.classList.contains("active")
     )
       renderNotifs();
-    // FIX: correct endpoint — /api/notifications/:id/read (now exists in backend)
     apiFetch(`/notifications/${id}/read`, { method: "PUT" }).catch(() => {});
   }
 }
@@ -1618,8 +1604,8 @@ async function markAllRead() {
 }
 
 function updateNB() {
-  const b1 = document.getElementById("notifBadge");
-  const b2 = document.getElementById("notifNavBadge");
+  const b1 = document.getElementById("notifBadge"),
+    b2 = document.getElementById("notifNavBadge");
   if (b1) {
     b1.textContent = notifCount;
     b1.style.display = notifCount ? "flex" : "none";
@@ -1646,18 +1632,49 @@ function addNotifLocal(icon, text, link) {
 }
 
 /* ── 19. WALLET ── */
+async function loadTransactions() {
+  const txEl = document.getElementById("txContent");
+  if (!txEl || !getToken()) return;
+  const data = await apiFetch("/wallet/transactions");
+  if (!Array.isArray(data)) return;
+  txList = data.map((t) => ({
+    icon: getTxIcon(t.category),
+    name: t.description || t.category,
+    date: timeAgo(t.createdAt),
+    amt: t.amount,
+    type: t.type,
+    balanceAfter: t.balanceAfter,
+  }));
+  renderWallet();
+}
+
+function getTxIcon(category) {
+  return (
+    {
+      add_funds: "💳",
+      bid_placed: "🔥",
+      bid_refund: "↩️",
+      bid_won: "🏆",
+      sent: "↗️",
+      received: "💸",
+      withdrawal: "↓",
+      buy_now: "⚡",
+    }[category] || "💰"
+  );
+}
+
 async function loadWallet() {
   if (!getToken()) return;
   const data = await apiFetch("/me");
   if (!data) return;
   walletBal = data.walletBalance || 0;
   myProfile = data;
-  renderWallet();
+  syncWalletDisplay();
+  await loadTransactions();
 }
 
 function syncWalletDisplay() {
-  const ids = ["walletBal", "profileWalletBal", "sidebarWalletBal"];
-  ids.forEach((id) => {
+  ["walletBal", "profileWalletBal", "sidebarWalletBal"].forEach((id) => {
     const el = document.getElementById(id);
     if (el)
       el.textContent =
@@ -1675,7 +1692,10 @@ function renderWallet() {
             (t) => `<div class="tx-item">
           <div class="tx-icon" style="background:${t.type === "credit" ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)"}">${t.icon}</div>
           <div style="flex:1"><div class="tx-name">${escapeHtml(t.name)}</div><div class="tx-date">${t.date}</div></div>
-          <div class="tx-amount ${t.type}">${t.type === "credit" ? "+" : "-"}₱${Math.abs(t.amt).toLocaleString()}</div>
+          <div style="text-align:right">
+            <div class="tx-amount ${t.type}">${t.type === "credit" ? "+" : "-"}₱${Math.abs(t.amt).toLocaleString()}</div>
+            ${t.balanceAfter !== undefined ? `<div style="font-size:10px;color:var(--muted2)">Bal: ₱${Number(t.balanceAfter).toLocaleString()}</div>` : ""}
+          </div>
         </div>`,
           )
           .join("")
@@ -1696,8 +1716,8 @@ function walletAction(type) {
     withdraw: "Withdraw to bank or e-wallet",
   };
   const g = (id) => document.getElementById(id);
-  if (g("wmTitle")) g("wmTitle").textContent = titles[type] || "Action";
-  if (g("wmSub")) g("wmSub").textContent = subs[type] || "";
+  if (g("wmTitle")) g("wmTitle").textContent = titles[type];
+  if (g("wmSub")) g("wmSub").textContent = subs[type];
   if (g("wmBtn"))
     g("wmBtn").textContent =
       type === "add" ? "Add Funds" : type === "send" ? "Send" : "Withdraw";
@@ -1729,17 +1749,17 @@ function updateWalletExtraFields(type, method) {
       html = `<div class="form-group"><label class="form-label">${method} Number</label><input class="form-input" id="wmPhone" placeholder="09XX XXX XXXX" maxlength="11"></div>`;
     else if (method === "Credit Card")
       html = `<div class="form-group"><label class="form-label">Card Number</label><input class="form-input" id="wmCardNum" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCardNum(this)"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div class="form-group"><label class="form-label">Expiry</label><input class="form-input" id="wmExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)"></div>
-                <div class="form-group"><label class="form-label">CVV</label><input class="form-input" id="wmCvv" placeholder="XXX" maxlength="4" type="password"></div>
-              </div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label class="form-label">Expiry</label><input class="form-input" id="wmExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)"></div>
+        <div class="form-group"><label class="form-label">CVV</label><input class="form-input" id="wmCvv" placeholder="XXX" maxlength="4" type="password"></div>
+      </div>`;
     else
       html = `<div class="form-group"><label class="form-label">Account Number</label><input class="form-input" id="wmBankNum" placeholder="Account number"></div>`;
   } else if (type === "send") {
     html = `<div class="form-group"><label class="form-label">${method === "BiliBid Wallet" ? "Recipient Username" : method + " Number"}</label><input class="form-input" id="wmRecip" placeholder="${method === "BiliBid Wallet" ? "@username" : "09XX XXX XXXX"}"></div>`;
   } else {
     html = `<div class="form-group"><label class="form-label">${method.includes("Bank") ? "Account Number" : method + " Number"}</label><input class="form-input" id="wmPhone" placeholder="${method.includes("Bank") ? "Account number" : "09XX XXX XXXX"}"></div>
-            <div class="form-group"><label class="form-label">Account Name</label><input class="form-input" id="wmAcctName" placeholder="Full name"></div>`;
+      <div class="form-group"><label class="form-label">Account Name</label><input class="form-input" id="wmAcctName" placeholder="Full name"></div>`;
   }
   extra.innerHTML = html;
 }
@@ -1766,52 +1786,112 @@ async function processWallet() {
     return;
   }
   closeWM();
+
   if (walletType === "add") {
     const res = await apiFetch("/wallet/add", {
       method: "POST",
-      body: JSON.stringify({ amount: amt }),
+      body: JSON.stringify({ amount: amt, method }),
     });
     if (!res) return;
-    walletBal =
-      res.walletBalance !== undefined ? res.walletBalance : walletBal + amt;
-    txList.unshift({
-      icon: "💳",
-      name: "Added via " + method,
-      date: "Just now",
-      amt,
-      type: "credit",
-    });
-    toast("✅ ₱" + amt.toLocaleString() + " added to wallet!", "success");
+    walletBal = res.walletBalance ?? walletBal + amt;
+    toast("✅ ₱" + amt.toLocaleString() + " added!", "success");
   } else if (walletType === "send") {
-    walletBal -= amt;
-    txList.unshift({
-      icon: "↗️",
-      name: "Sent via " + method,
-      date: "Just now",
-      amt,
-      type: "debit",
+    const recipient = document
+      .getElementById("wmRecip")
+      ?.value?.trim()
+      .replace("@", "");
+    if (!recipient) {
+      toast("⚠️ Enter recipient username", "error");
+      return;
+    }
+    const res = await apiFetch("/wallet/send", {
+      method: "POST",
+      body: JSON.stringify({
+        amount: amt,
+        recipientUsername: recipient,
+        method,
+      }),
     });
-    toast("↗️ ₱" + amt.toLocaleString() + " sent!", "success");
+    if (!res) return;
+    if (res.message && res.walletBalance === undefined) {
+      toast("⚠️ " + res.message, "error");
+      return;
+    }
+    walletBal = res.walletBalance ?? walletBal - amt;
+    toast(res.message || "↗️ ₱" + amt.toLocaleString() + " sent!", "success");
   } else {
-    walletBal -= amt;
-    txList.unshift({
-      icon: "↓",
-      name: "Withdrawal to " + method,
-      date: "Just now",
-      amt,
-      type: "debit",
+    const accountNumber =
+      document.getElementById("wmPhone")?.value?.trim() ||
+      document.getElementById("wmBankNum")?.value?.trim() ||
+      "";
+    const accountName =
+      document.getElementById("wmAcctName")?.value?.trim() || "";
+    const res = await apiFetch("/wallet/withdraw", {
+      method: "POST",
+      body: JSON.stringify({ amount: amt, method, accountNumber, accountName }),
     });
-    toast("↓ Withdrawal requested!", "success");
+    if (!res) return;
+    if (res.message && res.walletBalance === undefined) {
+      toast("⚠️ " + res.message, "error");
+      return;
+    }
+    walletBal = res.walletBalance ?? walletBal - amt;
+    toast(
+      "↓ Withdrawal of ₱" + amt.toLocaleString() + " requested!",
+      "success",
+    );
   }
   syncWalletDisplay();
-  renderWallet();
+  await loadTransactions();
 }
 
 function closeWM() {
   document.getElementById("walletModal")?.classList.remove("open");
 }
 
-/* ── 20. PROFILE ── */
+/* ── 20. SUGGESTED SELLERS ── */
+async function loadSuggestedSellers() {
+  const c = document.getElementById("suggestedSellersContent");
+  if (!c) return;
+  const data = await apiFetch("/users/suggested");
+  if (!Array.isArray(data) || !data.length) {
+    c.innerHTML = `<div style="background:var(--surface2);border-radius:14px;padding:14px;border:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--muted2)">No sellers yet — post the first auction!</div>
+    </div>`;
+    return;
+  }
+  c.innerHTML = data
+    .slice(0, 3)
+    .map(
+      (u) => `
+    <div style="background:var(--surface2);border-radius:14px;padding:14px;border:1px solid var(--border);margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:38px;height:38px;border-radius:50%;background:${hashColor(u.username || "")};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;overflow:hidden;flex-shrink:0;cursor:pointer" onclick="openUserProfile('${u._id}','${escapeHtml(u.username)}')">
+          ${u.avatar ? `<img src="${IMAGE_BASE}${u.avatar}" style="width:100%;height:100%;object-fit:cover">` : u.username.slice(0, 2).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:var(--gold);font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="openUserProfile('${u._id}','${escapeHtml(u.username)}')">${escapeHtml(u.username)}</div>
+          <div style="font-size:11px;color:var(--muted2)">${u.listingsCount || 0} listings · ${u.followersCount || 0} followers</div>
+        </div>
+      </div>
+      <button class="bid-btn" style="width:100%;padding:7px;font-size:12px" onclick="handleSuggestedFollow('${u._id}','${escapeHtml(u.username)}',this)">
+        ${followedUsers[u._id] ? "✓ Following" : "+ Follow"}
+      </button>
+    </div>`,
+    )
+    .join("");
+}
+
+async function handleSuggestedFollow(userId, username, btn) {
+  if (!getToken()) {
+    toast("⚠️ Please log in to follow sellers.", "error");
+    return;
+  }
+  const nowFollowing = await followUser(userId, username);
+  if (btn) btn.textContent = nowFollowing ? "✓ Following" : "+ Follow";
+}
+
+/* ── 21. PROFILE ── */
 async function loadProfile() {
   if (!getToken()) return;
   const data = await apiFetch("/me");
@@ -1837,7 +1917,6 @@ async function loadProfile() {
       (data.username || "") +
       (data.location ? " · " + data.location : "");
 
-  // FIX: use data.avatar (renamed from profilePic)
   if (data.avatar) {
     [
       "profileAvatarLarge",
@@ -1850,7 +1929,6 @@ async function loadProfile() {
         el.innerHTML = `<img src="${IMAGE_BASE}${data.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
     });
   }
-
   syncWalletDisplay();
 
   const stats = await apiFetch("/analytics");
@@ -1883,12 +1961,10 @@ function renderReviews(reviews, avg) {
   }
   const stars = (n) => "⭐".repeat(n) + "☆".repeat(5 - n);
   c.innerHTML =
-    `<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border)">
-    <div style="text-align:center;margin-bottom:8px">
-      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:42px;color:var(--gold)">${avg.toFixed(1)}</div>
-      <div style="font-size:20px">${stars(Math.round(avg))}</div>
-      <div style="font-size:12px;color:var(--muted2);margin-top:4px">${reviews.length} reviews</div>
-    </div>
+    `<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border);text-align:center">
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:42px;color:var(--gold)">${avg.toFixed(1)}</div>
+    <div style="font-size:20px">${stars(Math.round(avg))}</div>
+    <div style="font-size:12px;color:var(--muted2);margin-top:4px">${reviews.length} reviews</div>
   </div>` +
     reviews
       .map(
@@ -1906,9 +1982,9 @@ function renderReviews(reviews, avg) {
 }
 
 async function saveProfile() {
-  const bio = document.getElementById("editBio")?.value || "";
-  const location = document.getElementById("editLocation")?.value || "";
-  const username = document.getElementById("editName")?.value || "";
+  const bio = document.getElementById("editBio")?.value || "",
+    location = document.getElementById("editLocation")?.value || "",
+    username = document.getElementById("editName")?.value || "";
   const res = await apiFetch("/me", {
     method: "PUT",
     body: JSON.stringify({ bio, location, username }),
@@ -1925,11 +2001,9 @@ async function saveProfile() {
 async function uploadAvatar(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
-  // FIX: field name must match backend multer — "avatar"
   fd.append("avatar", input.files[0]);
   toast("⏳ Uploading avatar…", "info");
   try {
-    // FIX: correct endpoint — /api/users/upload-avatar (now exists in backend)
     const res = await fetch(`${API_BASE}/api/users/upload-avatar`, {
       method: "POST",
       headers: { Authorization: `Bearer ${getToken()}` },
@@ -1946,21 +2020,55 @@ async function uploadAvatar(input) {
           if (el) el.innerHTML = imgs;
         },
       );
-      // Save to localStorage for immediate display across pages
       localStorage.setItem("bbAvatar", uploadedAvatarUrl);
       toast("✅ Avatar updated!", "success");
-    } else throw new Error("No URL returned");
+    } else throw new Error("No URL");
   } catch (err) {
-    console.error("Avatar upload error:", err);
     toast("⚠️ Avatar upload failed", "error");
   }
 }
 
-function savePassword() {
-  toast("🔒 Password update coming soon.", "info");
+async function savePassword() {
+  const currentPw =
+    document.getElementById("currentPassword")?.value?.trim() || "";
+  const newPw = document.getElementById("newPassword")?.value?.trim() || "";
+  const confirmPw =
+    document.getElementById("confirmPassword")?.value?.trim() || "";
+  if (!currentPw || !newPw) {
+    toast("⚠️ Fill in all password fields", "error");
+    return;
+  }
+  if (newPw.length < 6) {
+    toast("⚠️ New password must be at least 6 characters", "error");
+    return;
+  }
+  if (newPw !== confirmPw) {
+    toast("⚠️ Passwords do not match", "error");
+    return;
+  }
+  const btn = document.getElementById("savePasswordBtn");
+  if (btn) {
+    btn.textContent = "⏳ Saving…";
+    btn.disabled = true;
+  }
+  const res = await apiFetch("/me/password", {
+    method: "PUT",
+    body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+  });
+  if (btn) {
+    btn.textContent = "🔒 Update Password";
+    btn.disabled = false;
+  }
+  if (res?.message === "Password updated successfully") {
+    toast("🔒 Password updated!", "success");
+    ["currentPassword", "newPassword", "confirmPassword"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+  } else toast("⚠️ " + (res?.message || "Failed to update password"), "error");
 }
 
-/* ── 21. CONVERSATIONS ── */
+/* ── 22. CONVERSATIONS ── */
 async function loadConversations() {
   const c = document.getElementById("conversationsContent");
   if (!c) return;
@@ -1970,11 +2078,9 @@ async function loadConversations() {
     return;
   }
   c.innerHTML = '<div class="loading-state">Loading conversations…</div>';
-  // FIX: backend now handles GET /api/messages (no suffix needed)
   const threads = await apiFetch("/messages");
   if (!Array.isArray(threads) || !threads.length) {
-    c.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted2)">
-      <div style="font-size:48px;margin-bottom:12px">💬</div><div>No conversations yet.</div></div>`;
+    c.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">💬</div><div>No conversations yet.</div></div>`;
     return;
   }
   c.innerHTML = threads
@@ -1998,7 +2104,7 @@ async function loadConversations() {
     .join("");
 }
 
-/* ── 22. CHAT POPUP ── */
+/* ── 23. CHAT POPUP ── */
 async function openChatPopup(userId, username) {
   if (!userId || userId === getUserId()) return;
   currentChatUserId = userId;
@@ -2019,12 +2125,11 @@ async function openChatPopup(userId, username) {
   win.unread = 0;
   renderChatHeads();
 
-  const popup = document.getElementById("chatPopup");
-  const msgsEl = document.getElementById("chatMsgs");
-  const cn = document.getElementById("chatName");
-  const cs = document.getElementById("chatStat");
-  const ca = document.getElementById("chatAv");
-
+  const popup = document.getElementById("chatPopup"),
+    msgsEl = document.getElementById("chatMsgs");
+  const cn = document.getElementById("chatName"),
+    cs = document.getElementById("chatStat"),
+    ca = document.getElementById("chatAv");
   if (cn) cn.textContent = currentChatUsername;
   if (cs)
     cs.innerHTML = onlineUsers[userId]
@@ -2049,10 +2154,7 @@ async function openChatPopup(userId, username) {
   const msgs = await apiFetch(`/messages/${userId}`);
   if (!msgsEl) return;
   if (!Array.isArray(msgs) || !msgs.length) {
-    msgsEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted2)">
-      <div style="font-size:32px;margin-bottom:8px">💬</div>
-      <div style="font-size:13px">Start a conversation with ${escapeHtml(currentChatUsername)}</div>
-    </div>`;
+    msgsEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted2)"><div style="font-size:32px;margin-bottom:8px">💬</div><div style="font-size:13px">Start a conversation with ${escapeHtml(currentChatUsername)}</div></div>`;
   } else {
     msgsEl.innerHTML = msgs
       .map((m) => {
@@ -2060,7 +2162,7 @@ async function openChatPopup(userId, username) {
           ? m.senderId._id.toString()
           : String(m.senderId || "");
         const isMe = senderStr === getUserId();
-        const name = isMe ? "You" : m.senderName || currentChatUsername;
+        const name = isMe ? "" : m.senderName || currentChatUsername;
         const content =
           m.messageType === "image"
             ? `<img src="${IMAGE_BASE}${m.imageUrl}" class="chat-img-preview" onclick="openImg('${IMAGE_BASE}${m.imageUrl}')">`
@@ -2069,7 +2171,7 @@ async function openChatPopup(userId, username) {
           isMe ? "me" : "them",
           content,
           fmtTime(m.createdAt),
-          isMe ? "" : name,
+          name,
         );
       })
       .join("");
@@ -2080,8 +2182,7 @@ async function openChatPopup(userId, username) {
 function buildMsgHtml(side, content, time, name) {
   return `<div class="msg ${side}">
     ${name && side === "them" ? `<div style="font-size:10px;color:var(--muted2);margin-bottom:3px;font-weight:600">${escapeHtml(name)}</div>` : ""}
-    ${content}
-    <div class="msg-time">${time}</div>
+    ${content}<div class="msg-time">${time}</div>
   </div>`;
 }
 
@@ -2113,7 +2214,6 @@ function showTyping(username) {
 function hideTyping() {
   document.getElementById("typingIndicator")?.remove();
 }
-
 function closeChat() {
   document.getElementById("chatPopup")?.classList.remove("open");
   currentChatUserId = "";
@@ -2128,7 +2228,6 @@ async function sendMsg() {
     toast("⚠️ Please log in to send messages.", "error");
     return;
   }
-
   const time = fmtTime(Date.now());
 
   if (hasPendingImg) {
@@ -2138,9 +2237,7 @@ async function sendMsg() {
       `<img src="${imgSrc}" class="chat-img-preview" onclick="openImg('${imgSrc}')">`,
       time,
     );
-
-    if (socket?.connected && currentChatUserId) {
-      // FIX: emit "sendMessage" which backend now handles
+    if (socket?.connected && currentChatUserId)
       socket.emit("sendMessage", {
         to: currentChatUserId,
         from: getUserId(),
@@ -2148,8 +2245,7 @@ async function sendMsg() {
         imageUrl: window._pendingChatImg,
         messageType: "image",
       });
-    } else {
-      // REST fallback
+    else
       await apiFetch("/messages", {
         method: "POST",
         body: JSON.stringify({
@@ -2159,16 +2255,13 @@ async function sendMsg() {
           messageType: "image",
         }),
       });
-    }
     window._pendingChatImg = null;
     const prev = document.getElementById("chatImgPreview");
     if (prev) prev.innerHTML = "";
   } else {
     appendChatMsg("me", escapeHtml(text), time);
     if (input) input.value = "";
-
     if (socket?.connected && currentChatUserId) {
-      // FIX: emit "sendMessage" which backend now handles + relays
       socket.emit("sendMessage", {
         to: currentChatUserId,
         from: getUserId(),
@@ -2176,13 +2269,11 @@ async function sendMsg() {
         messageType: "text",
       });
       socket.emit("stopTyping", { to: currentChatUserId, from: getUserId() });
-    } else {
-      // REST fallback when socket is not connected
+    } else
       await apiFetch("/messages", {
         method: "POST",
         body: JSON.stringify({ receiverId: currentChatUserId, message: text }),
       });
-    }
     isTyping = false;
   }
 }
@@ -2221,9 +2312,9 @@ async function handleChatImageUpload(input) {
       const preview = document.getElementById("chatImgPreview");
       if (preview)
         preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-          <img src="${IMAGE_BASE}${data.urls[0]}" style="max-height:60px;border-radius:8px">
-          <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
-        </div>`;
+        <img src="${IMAGE_BASE}${data.urls[0]}" style="max-height:60px;border-radius:8px">
+        <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
+      </div>`;
       toast("✅ Image ready to send", "success");
     }
   } catch {
@@ -2231,7 +2322,7 @@ async function handleChatImageUpload(input) {
   }
 }
 
-/* ── 23. CHAT HEADS ── */
+/* ── 24. CHAT HEADS ── */
 function renderChatHeads() {
   const container = document.getElementById("chatHeads");
   if (!container) return;
@@ -2243,18 +2334,17 @@ function renderChatHeads() {
     .slice(-4)
     .map(
       (w) => `
-      <div class="chat-bubble" style="background:${w.color}" onclick="openChatPopup('${w.userId}','${escapeHtml(w.username)}')" title="${escapeHtml(w.username)}">
-        ${w.avatar ? `<img src="${IMAGE_BASE}${w.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : w.username.slice(0, 2).toUpperCase()}
-        ${w.unread ? `<div class="unread-dot">${w.unread}</div>` : ""}
-        <div style="position:absolute;bottom:2px;right:2px;width:10px;height:10px;border-radius:50%;background:${onlineUsers[w.userId] ? "var(--online)" : "var(--muted)"};border:2px solid var(--bg)"></div>
-      </div>`,
+    <div class="chat-bubble" style="background:${w.color}" onclick="openChatPopup('${w.userId}','${escapeHtml(w.username)}')" title="${escapeHtml(w.username)}">
+      ${w.avatar ? `<img src="${IMAGE_BASE}${w.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : w.username.slice(0, 2).toUpperCase()}
+      ${w.unread ? `<div class="unread-dot">${w.unread}</div>` : ""}
+      <div style="position:absolute;bottom:2px;right:2px;width:10px;height:10px;border-radius:50%;background:${onlineUsers[w.userId] ? "var(--online)" : "var(--muted)"};border:2px solid var(--bg)"></div>
+    </div>`,
     )
     .join("");
 }
 
-/* ── 24. LIVE SEARCH ── */
+/* ── 25. SEARCH ── */
 let searchTimer = null;
-
 function showSR() {
   const sr = document.getElementById("searchResults");
   if (sr) sr.style.display = "block";
@@ -2284,7 +2374,6 @@ function handleSearch(q) {
 async function doSearch(q) {
   const box = document.getElementById("searchResults");
   if (!box) return;
-  // FIX: /api/users now exists — no more 404 on search
   const [auctionsData, usersData] = await Promise.all([
     apiFetch(`/auctions?search=${encodeURIComponent(q)}&status=active`).catch(
       () => null,
@@ -2306,13 +2395,13 @@ async function doSearch(q) {
     html += users
       .map(
         (u) => `
-      <div class="search-result-item" onclick="openUserProfile('${u._id}','${escapeHtml(u.username)}')">
+      <div class="search-result-item" onclick="document.getElementById('searchResults').style.display='none';openUserProfile('${u._id}','${escapeHtml(u.username)}')">
         <div style="width:40px;height:40px;border-radius:50%;background:${hashColor(u.username || "")};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;overflow:hidden">
           ${u.avatar ? `<img src="${IMAGE_BASE}${u.avatar}" style="width:100%;height:100%;object-fit:cover">` : (u.username || "U").slice(0, 2).toUpperCase()}
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px">${escapeHtml(u.username || "User")}</div>
-          <div style="font-size:12px;color:var(--muted2)">${u.isOnline ? "🟢 Online" : "Seller"} · ${u.followersCount || 0} followers</div>
+          <div style="font-size:12px;color:var(--muted2)">${u.followersCount || 0} followers</div>
         </div>
         <button class="bid-btn" style="padding:5px 12px;font-size:11px;flex-shrink:0" onclick="event.stopPropagation();followUser('${u._id}','${escapeHtml(u.username)}')">
           ${followedUsers[u._id] ? "✓ Following" : "+ Follow"}
@@ -2321,7 +2410,6 @@ async function doSearch(q) {
       )
       .join("");
   }
-
   if (auctions.length) {
     html +=
       '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 14px 4px">Auctions</div>';
@@ -2329,7 +2417,7 @@ async function doSearch(q) {
       .map(
         (m) => `
       <div class="search-result-item" onclick="navigate('feed')">
-        <div style="width:40px;height:40px;border-radius:8px;background:${hashColor(m.sellerName || "")};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">
+        <div style="width:40px;height:40px;border-radius:8px;background:${hashColor(m.sellerName || "")};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0;overflow:hidden">
           ${m.images?.length ? `<img src="${m.images[0].startsWith("http") ? m.images[0] : IMAGE_BASE + m.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : "🏷️"}
         </div>
         <div style="flex:1;min-width:0">
@@ -2344,13 +2432,15 @@ async function doSearch(q) {
   box.style.display = "block";
 }
 
-/* ── 25. TRACKING ── */
+/* ── 26. TRACKING ── */
 async function openTracking(auctionId) {
-  const url = `trackorder.html?auctionId=${auctionId}&token=${getToken()}`;
-  window.open(url, "_blank");
+  window.open(
+    `trackorder.html?auctionId=${auctionId}&token=${getToken()}`,
+    "_blank",
+  );
 }
 
-/* ── 26. POST AUCTION MODAL ── */
+/* ── 27. POST AUCTION ── */
 function openModal() {
   if (!getToken()) {
     toast("⚠️ Please log in to post an auction.", "error");
@@ -2391,7 +2481,16 @@ async function handleUpload(input) {
     if (data.urls) {
       uploadedImageUrls = data.urls;
       if (ui) ui.textContent = "✅";
-      if (ut) ut.textContent = `${input.files.length} photo(s) ready`;
+      if (ut) {
+        // Show mini previews
+        const thumbs = data.urls
+          .map(
+            (u) =>
+              `<img src="${IMAGE_BASE}${u}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`,
+          )
+          .join("");
+        ut.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px">${thumbs}</div><div style="margin-top:6px;color:var(--green)">${input.files.length} photo(s) ready</div>`;
+      }
       toast("✅ Photos uploaded!", "success");
     } else throw new Error(data.message || "Upload failed");
   } catch (err) {
@@ -2451,16 +2550,15 @@ async function submitPost() {
       shipping: ship,
     }),
   });
-
   if (btn) {
     btn.textContent = "🚀 Post Auction";
     btn.disabled = false;
   }
-
   if (!res?.auction) {
     toast("⚠️ " + (res?.message || "Failed to post auction"), "error");
     return;
   }
+
   uploadedImageUrls = [];
   closeModal();
   toast("🚀 Auction posted and now live!", "success");
@@ -2468,7 +2566,7 @@ async function submitPost() {
   await loadFeed();
 }
 
-/* ── 27. AUTH ── */
+/* ── 28. AUTH ── */
 async function login(email, password) {
   const btn = document.querySelector("#loginForm .btn-submit");
   if (btn) {
@@ -2496,8 +2594,11 @@ async function login(email, password) {
   initSocket();
   toast("✅ Welcome back, " + res.user.username + "! 👋", "success");
   navigate("feed");
-  await loadNotifications();
-  await loadMyAuctions("active");
+  await Promise.all([
+    loadNotifications(),
+    loadMyAuctions("active"),
+    loadSuggestedSellers(),
+  ]);
   return true;
 }
 
@@ -2538,6 +2639,7 @@ function logout() {
       clearAuth();
       disconnectSocket();
 
+      /* Reset all state */
       walletBal = 0;
       notifs = [];
       cachedPosts = [];
@@ -2585,41 +2687,37 @@ function logout() {
           '<div style="font-size:12px;color:var(--muted2);padding:8px">No notifications yet.</div>';
 
       syncUIToAuthState();
-      navigate("feed");
+      navigate("feed"); // will show guest prompt since token is cleared
       toast("👋 Logged out. See you soon!", "info");
     },
   );
 }
 
-/* ── 28. UI SYNC ── */
+/* ── 29. UI SYNC ── */
 function syncUIToAuthState() {
-  const token = getToken();
-  const username = getUsername() || "";
-  const avatar = localStorage.getItem("bbAvatar") || "";
+  const token = getToken(),
+    username = getUsername() || "",
+    avatar = localStorage.getItem("bbAvatar") || "";
   const initials = username.slice(0, 2).toUpperCase() || "??";
 
-  const loggedIn = document.getElementById("loggedInActions");
-  const loggedOut = document.getElementById("loggedOutActions");
+  const loggedIn = document.getElementById("loggedInActions"),
+    loggedOut = document.getElementById("loggedOutActions");
   if (loggedIn) loggedIn.style.display = token ? "flex" : "none";
   if (loggedOut) loggedOut.style.display = token ? "none" : "flex";
-
   const gb = document.getElementById("guestBanner");
   if (gb) gb.style.display = token ? "none" : "flex";
 
-  const textIds = [
+  [
     "topbarAvatar",
     "sidebarAvatarText",
     "composerAvatar",
     "profileAvatarLarge",
-  ];
-  textIds.forEach((id) => {
+  ].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (avatar && !el.querySelector("img")) {
+    if (avatar && !el.querySelector("img"))
       el.innerHTML = `<img src="${IMAGE_BASE}${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-    } else if (!avatar && !el.querySelector("img")) {
-      el.textContent = initials;
-    }
+    else if (!avatar && !el.querySelector("img")) el.textContent = initials;
   });
 
   const sn = document.getElementById("sidebarName");
@@ -2633,7 +2731,7 @@ function syncUIToAuthState() {
   if (ph) ph.textContent = username ? "@" + username : "@—";
 }
 
-/* ── 29. UTILITIES ── */
+/* ── 30. UTILITIES ── */
 function toast(msg, type) {
   const t = document.getElementById("toast");
   if (!t) return;
@@ -2677,7 +2775,7 @@ function closeConfirm() {
   document.getElementById("confirmOverlay")?.classList.remove("open");
 }
 
-/* ── 30. INIT ── */
+/* ── 31. INIT ── */
 async function appInit() {
   syncUIToAuthState();
   updateNB();
@@ -2690,10 +2788,12 @@ async function appInit() {
       walletBal = me.walletBalance || 0;
       myProfile = me;
       syncWalletDisplay();
-    } else {
-      clearAuth(); // token invalid → force guest mode
-    }
-    await Promise.all([loadNotifications(), loadMyAuctions("active")]);
+    } else clearAuth();
+    await Promise.all([
+      loadNotifications(),
+      loadMyAuctions("active"),
+      loadSuggestedSellers(),
+    ]);
     syncUIToAuthState();
   }
 
@@ -2704,8 +2804,8 @@ window.addEventListener("load", appInit);
 if (document.readyState === "complete" || document.readyState === "interactive")
   appInit();
 
-/* ── 31. EXPOSE GLOBALS ── */
-const _exports = {
+/* ── 32. EXPOSE GLOBALS ── */
+Object.assign(window, {
   navigate,
   toast,
   openModal,
@@ -2779,5 +2879,8 @@ const _exports = {
   syncUIToAuthState,
   reportItem,
   openImg,
-};
-Object.assign(window, _exports);
+  loadTransactions,
+  getTxIcon,
+  handleSuggestedFollow,
+  loadSuggestedSellers,
+});

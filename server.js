@@ -4,7 +4,7 @@ const express = require("express");
 const path = require("path");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const fs = require("fs");
@@ -14,36 +14,23 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-/* ==============================
-   SOCKET.IO — FIXED CORS + RELAY
-============================== */
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
+  cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["websocket", "polling"],
 });
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "bilibid_secret_key";
 
-/* ==============================
-   MIDDLEWARE
-============================== */
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Ensure uploads directory exists
 const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-/* ==============================
-   MULTER (Image Uploads)
-============================== */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -53,7 +40,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (allowed.includes(file.mimetype)) cb(null, true);
@@ -61,9 +48,6 @@ const upload = multer({
   },
 });
 
-/* ==============================
-   AUTH MIDDLEWARE
-============================== */
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Unauthorized" });
@@ -75,24 +59,24 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-/* ==============================
-   MONGODB CONNECTION
-============================== */
-console.log("MONGO_URI:", process.env.MONGO_URI);
+/* ── MongoDB — dbName forces correct database regardless of URI ── */
+console.log("MONGO_URI:", process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"));
 mongoose.set("strictQuery", true);
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB Connected");
-    console.log("📌 DB:", mongoose.connection.name);
+  .connect(process.env.MONGO_URI, { dbName: "BiliBid" })
+  .then(async () => {
+    console.log(
+      "✅ MongoDB Connected to DB:",
+      mongoose.connection.db.databaseName,
+    );
+    await createIndexes();
   })
   .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err.message);
+    console.error("❌ MongoDB Error:", err.message);
+    process.exit(1);
   });
-/* ==============================
-   SCHEMAS
-============================== */
 
+/* ── SCHEMAS ── */
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true },
@@ -129,6 +113,7 @@ const auctionSchema = new mongoose.Schema(
       required: true,
     },
     sellerName: { type: String, required: true },
+    sellerAvatar: { type: String, default: "" },
     winnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -169,6 +154,7 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    senderName: { type: String, default: "" },
     message: { type: String, default: "" },
     messageType: {
       type: String,
@@ -237,7 +223,6 @@ const storySchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// NEW: Transaction schema
 const transactionSchema = new mongoose.Schema(
   {
     userId: {
@@ -246,11 +231,7 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    type: {
-      type: String,
-      enum: ["credit", "debit"],
-      required: true,
-    },
+    type: { type: String, enum: ["credit", "debit"], required: true },
     category: {
       type: String,
       enum: [
@@ -293,7 +274,6 @@ const Transaction = mongoose.model("Transaction", transactionSchema);
 
 async function createIndexes() {
   try {
-    // AUCTIONS
     await Auction.collection.createIndex({ status: 1, createdAt: -1 });
     await Auction.collection.createIndex({ sellerId: 1 });
     await Auction.collection.createIndex({
@@ -301,55 +281,58 @@ async function createIndexes() {
       description: "text",
     });
     await Auction.collection.createIndex({ endsAt: 1 });
-
-    // MESSAGES
     await Message.collection.createIndex({
       senderId: 1,
       receiverId: 1,
       createdAt: 1,
     });
     await Message.collection.createIndex({ receiverId: 1, read: 1 });
-
-    // USERS
     await User.collection.createIndex({ username: 1 });
-
-    // NOTIFICATIONS
     await Notification.collection.createIndex({
       userId: 1,
       read: 1,
       createdAt: -1,
     });
-
-    // STORIES (TTL AUTO DELETE)
     await Story.collection.createIndex(
       { expiresAt: 1 },
       { expireAfterSeconds: 0 },
     );
-
-    // TRANSACTIONS
     await Transaction.collection.createIndex({ userId: 1, createdAt: -1 });
-
-    console.log("✅ Indexes created successfully");
+    console.log("✅ Indexes created");
   } catch (err) {
-    console.error("❌ Index creation error:", err.message);
+    console.error("❌ Index error:", err.message);
   }
 }
-/* ==============================
-   ROOT ROUTE
-============================== */
+
+/* ══════════════════════════════
+   DEBUG
+══════════════════════════════ */
+app.get("/api/debug", (req, res) => {
+  res.json({
+    db: mongoose.connection.db?.databaseName,
+    host: mongoose.connection.host,
+    readyState: mongoose.connection.readyState,
+    version: "v5-bilibid",
+    mongoUri: process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"),
+  });
+});
+
+/* ══════════════════════════════
+   ROOT
+══════════════════════════════ */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "BiliBidMain.html"));
 });
 
-/* ==============================
-   IMAGE UPLOAD ROUTES
-============================== */
+/* ══════════════════════════════
+   UPLOADS
+══════════════════════════════ */
 app.post(
   "/api/upload",
   authMiddleware,
   upload.array("images", 5),
   (req, res) => {
-    if (!req.files || req.files.length === 0)
+    if (!req.files?.length)
       return res.status(400).json({ message: "No files uploaded" });
     const urls = req.files.map((f) => `/uploads/${f.filename}`);
     res.json({ urls });
@@ -366,19 +349,11 @@ app.post(
   },
 );
 
-/* ==============================
-   AUTH ROUTES
-============================== */
-
-/* REGISTER */
+/* ══════════════════════════════
+   AUTH
+══════════════════════════════ */
 app.post("/api/register", async (req, res) => {
   try {
-    console.log(
-      "[REGISTER] DB:",
-      mongoose.connection.db.databaseName,
-      "| Host:",
-      mongoose.connection.host,
-    );
     const { username, email, password } = req.body;
     if (!username || !email || !password)
       return res.status(400).json({ message: "All fields required" });
@@ -387,19 +362,23 @@ app.post("/api/register", async (req, res) => {
         .status(400)
         .json({ message: "Password must be at least 6 characters" });
 
+    console.log(
+      "[REGISTER] DB:",
+      mongoose.connection.db?.databaseName,
+      "host:",
+      mongoose.connection.host,
+    );
+
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing)
       return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({ username, email, password: hashed });
-
     const token = jwt.sign(
       { id: user._id, username: user.username },
       JWT_SECRET,
-      {
-        expiresIn: "7d",
-      },
+      { expiresIn: "7d" },
     );
 
     res.status(201).json({
@@ -419,7 +398,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-/* LOGIN */
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -435,9 +413,7 @@ app.post("/api/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username },
       JWT_SECRET,
-      {
-        expiresIn: "7d",
-      },
+      { expiresIn: "7d" },
     );
 
     res.json({
@@ -459,7 +435,6 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* GET CURRENT USER */
 app.get("/api/me", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -470,7 +445,6 @@ app.get("/api/me", authMiddleware, async (req, res) => {
   }
 });
 
-/* UPDATE PROFILE */
 app.put("/api/me", authMiddleware, async (req, res) => {
   try {
     const { bio, location, avatar, username } = req.body;
@@ -479,7 +453,6 @@ app.put("/api/me", authMiddleware, async (req, res) => {
     if (location !== undefined) update.location = location;
     if (avatar !== undefined) update.avatar = avatar;
     if (username !== undefined) update.username = username;
-
     const user = await User.findByIdAndUpdate(req.user.id, update, {
       new: true,
     }).select("-password");
@@ -489,7 +462,6 @@ app.put("/api/me", authMiddleware, async (req, res) => {
   }
 });
 
-/* CHANGE PASSWORD */
 app.put("/api/me/password", authMiddleware, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -509,7 +481,6 @@ app.put("/api/me/password", authMiddleware, async (req, res) => {
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
-
     res.json({ message: "Password updated successfully" });
   } catch (err) {
     console.error("Password change error:", err);
@@ -517,23 +488,19 @@ app.put("/api/me/password", authMiddleware, async (req, res) => {
   }
 });
 
-/* ==============================
-   WALLET ROUTES
-============================== */
-
-/* WALLET: ADD FUNDS — records transaction */
+/* ══════════════════════════════
+   WALLET
+══════════════════════════════ */
 app.post("/api/wallet/add", authMiddleware, async (req, res) => {
   try {
     const { amount, method } = req.body;
     if (!amount || Number(amount) <= 0)
       return res.status(400).json({ message: "Invalid amount" });
-
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: Number(amount) } },
       { new: true },
     ).select("-password");
-
     await Transaction.create({
       userId: req.user.id,
       type: "credit",
@@ -543,15 +510,12 @@ app.post("/api/wallet/add", authMiddleware, async (req, res) => {
       balanceAfter: user.walletBalance,
       method: method || "GCash",
     });
-
     res.json({ message: "Funds added", walletBalance: user.walletBalance });
   } catch (err) {
-    console.error("Wallet add error:", err);
     res.status(500).json({ message: "Failed to add funds" });
   }
 });
 
-/* WALLET: SEND MONEY TO ANOTHER USER */
 app.post("/api/wallet/send", authMiddleware, async (req, res) => {
   try {
     const { amount, recipientUsername, method } = req.body;
@@ -582,7 +546,6 @@ app.post("/api/wallet/send", authMiddleware, async (req, res) => {
       { $inc: { walletBalance: -sendAmt } },
       { new: true },
     );
-
     const updatedRecipient = await User.findByIdAndUpdate(
       recipient._id,
       { $inc: { walletBalance: sendAmt } },
@@ -599,7 +562,6 @@ app.post("/api/wallet/send", authMiddleware, async (req, res) => {
       balanceAfter: updatedSender.walletBalance,
       method: method || "BiliBid Wallet",
     });
-
     await Transaction.create({
       userId: recipient._id,
       type: "credit",
@@ -610,12 +572,10 @@ app.post("/api/wallet/send", authMiddleware, async (req, res) => {
       balanceAfter: updatedRecipient.walletBalance,
       method: "BiliBid Wallet",
     });
-
     await Notification.create({
       userId: recipient._id,
       type: "message",
       message: `💸 @${req.user.username} sent you ₱${sendAmt.toLocaleString()}!`,
-      link: "",
     });
 
     res.json({
@@ -623,21 +583,17 @@ app.post("/api/wallet/send", authMiddleware, async (req, res) => {
       walletBalance: updatedSender.walletBalance,
     });
   } catch (err) {
-    console.error("Wallet send error:", err);
     res.status(500).json({ message: "Failed to send money" });
   }
 });
 
-/* WALLET: WITHDRAW */
 app.post("/api/wallet/withdraw", authMiddleware, async (req, res) => {
   try {
-    const { amount, method, accountNumber, accountName } = req.body;
+    const { amount, method, accountNumber } = req.body;
     if (!amount || Number(amount) <= 0)
       return res.status(400).json({ message: "Invalid amount" });
-
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-
     const withdrawAmt = Number(amount);
     if (user.walletBalance < withdrawAmt)
       return res.status(400).json({ message: "Insufficient wallet balance" });
@@ -647,7 +603,6 @@ app.post("/api/wallet/withdraw", authMiddleware, async (req, res) => {
       { $inc: { walletBalance: -withdrawAmt } },
       { new: true },
     );
-
     await Transaction.create({
       userId: req.user.id,
       type: "debit",
@@ -657,18 +612,15 @@ app.post("/api/wallet/withdraw", authMiddleware, async (req, res) => {
       balanceAfter: updatedUser.walletBalance,
       method: method || "GCash",
     });
-
     res.json({
       message: `✅ ₱${withdrawAmt.toLocaleString()} withdrawal requested`,
       walletBalance: updatedUser.walletBalance,
     });
   } catch (err) {
-    console.error("Wallet withdraw error:", err);
     res.status(500).json({ message: "Failed to process withdrawal" });
   }
 });
 
-/* WALLET: GET TRANSACTION HISTORY */
 app.get("/api/wallet/transactions", authMiddleware, async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user.id })
@@ -676,18 +628,15 @@ app.get("/api/wallet/transactions", authMiddleware, async (req, res) => {
       .limit(50)
       .populate("relatedUserId", "username avatar")
       .populate("relatedAuctionId", "title");
-
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch transactions" });
   }
 });
 
-/* ==============================
-   USER ROUTES
-============================== */
-
-/* GET /api/users?search=q — used by live search */
+/* ══════════════════════════════
+   USERS
+══════════════════════════════ */
 app.get("/api/users", async (req, res) => {
   try {
     const { search } = req.query;
@@ -709,24 +658,82 @@ app.get("/api/users", async (req, res) => {
         })()
       : null;
 
-    const result = users.map((u) => ({
-      _id: u._id,
-      username: u.username,
-      avatar: u.avatar,
-      bio: u.bio,
-      followersCount: u.followers?.length || 0,
-      followingCount: u.following?.length || 0,
-      isFollowing: myId
-        ? u.followers.some((f) => f.toString() === myId)
-        : false,
-    }));
-    res.json(result);
+    res.json(
+      users.map((u) => ({
+        _id: u._id,
+        username: u.username,
+        avatar: u.avatar,
+        bio: u.bio,
+        followersCount: u.followers?.length || 0,
+        followingCount: u.following?.length || 0,
+        isFollowing: myId
+          ? u.followers.some((f) => f.toString() === myId)
+          : false,
+      })),
+    );
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch users" });
   }
 });
 
-/* GET /api/users/:id — used by openUserProfile() */
+/* GET suggested sellers — real users with most listings */
+app.get("/api/users/suggested", async (req, res) => {
+  try {
+    const myId = req.headers.authorization
+      ? (() => {
+          try {
+            return jwt.verify(
+              req.headers.authorization.split(" ")[1],
+              JWT_SECRET,
+            ).id;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+    // Get users with most active auctions
+    const topSellers = await Auction.aggregate([
+      { $match: { status: "active" } },
+      {
+        $group: {
+          _id: "$sellerId",
+          count: { $sum: 1 },
+          sellerName: { $first: "$sellerName" },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]);
+
+    const userIds = topSellers.map((s) => s._id);
+    const users = await User.find({ _id: { $in: userIds } }).select(
+      "-password -email",
+    );
+
+    res.json(
+      users.map((u) => {
+        const agg = topSellers.find(
+          (s) => s._id.toString() === u._id.toString(),
+        );
+        return {
+          _id: u._id,
+          username: u.username,
+          avatar: u.avatar,
+          bio: u.bio,
+          listingsCount: agg?.count || 0,
+          followersCount: u.followers?.length || 0,
+          isFollowing: myId
+            ? u.followers.some((f) => f.toString() === myId)
+            : false,
+        };
+      }),
+    );
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch suggested sellers" });
+  }
+});
+
 app.get("/api/users/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password -email");
@@ -746,7 +753,6 @@ app.get("/api/users/:id", async (req, res) => {
       : null;
 
     const listingsCount = await Auction.countDocuments({ sellerId: user._id });
-
     res.json({
       _id: user._id,
       username: user.username,
@@ -765,10 +771,20 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
-/* POST /api/users/:id/follow */
+/* Follow — accepts both ObjectId and username */
 app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
   try {
-    const targetId = req.params.id;
+    let targetId = req.params.id;
+
+    // If not a valid ObjectId, try to find by username
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      const found = await User.findOne({
+        username: { $regex: `^${targetId}$`, $options: "i" },
+      });
+      if (!found) return res.status(404).json({ message: "User not found" });
+      targetId = found._id.toString();
+    }
+
     if (targetId === req.user.id)
       return res.status(400).json({ message: "Cannot follow yourself" });
 
@@ -802,11 +818,11 @@ app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
       res.json({ following: true });
     }
   } catch (err) {
+    console.error("Follow error:", err);
     res.status(500).json({ message: "Follow action failed" });
   }
 });
 
-/* DELETE /api/users/:id/follow */
 app.delete("/api/users/:id/follow", authMiddleware, async (req, res) => {
   try {
     const targetId = req.params.id;
@@ -822,7 +838,6 @@ app.delete("/api/users/:id/follow", authMiddleware, async (req, res) => {
   }
 });
 
-/* POST /api/users/upload-avatar */
 app.post(
   "/api/users/upload-avatar",
   authMiddleware,
@@ -840,11 +855,9 @@ app.post(
   },
 );
 
-/* ==============================
-   AUCTION ROUTES
-============================== */
-
-/* GET ALL AUCTIONS (with filters) */
+/* ══════════════════════════════
+   AUCTIONS
+══════════════════════════════ */
 app.get("/api/auctions", async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, location, status, sellerId } =
@@ -863,7 +876,6 @@ app.get("/api/auctions", async (req, res) => {
 
     const auctions = await Auction.find(filter).sort({ createdAt: -1 });
 
-    // Auto-end expired auctions
     const now = Date.now();
     for (const auction of auctions) {
       if (auction.status === "active" && now > auction.endsAt) {
@@ -875,7 +887,7 @@ app.get("/api/auctions", async (req, res) => {
           await Notification.create({
             userId: winner.bidderId,
             type: "won",
-            message: `🏆 You won the auction for "${auction.title}" with a bid of ₱${winner.bidAmount}!`,
+            message: `🏆 You won "${auction.title}" with a bid of ₱${winner.bidAmount}!`,
           });
         }
         await auction.save();
@@ -888,7 +900,6 @@ app.get("/api/auctions", async (req, res) => {
   }
 });
 
-/* GET MY AUCTIONS — must be before /:id */
 app.get("/api/auctions/user/mine", authMiddleware, async (req, res) => {
   try {
     const auctions = await Auction.find({ sellerId: req.user.id }).sort({
@@ -900,7 +911,6 @@ app.get("/api/auctions/user/mine", authMiddleware, async (req, res) => {
   }
 });
 
-/* GET WON AUCTIONS — must be before /:id */
 app.get("/api/auctions/user/won", authMiddleware, async (req, res) => {
   try {
     const auctions = await Auction.find({
@@ -913,7 +923,6 @@ app.get("/api/auctions/user/won", authMiddleware, async (req, res) => {
   }
 });
 
-/* GET SINGLE AUCTION */
 app.get("/api/auctions/:id", async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -924,7 +933,6 @@ app.get("/api/auctions/:id", async (req, res) => {
   }
 });
 
-/* CREATE AUCTION */
 app.post("/api/auctions", authMiddleware, async (req, res) => {
   try {
     const {
@@ -942,6 +950,9 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
     if (!title || !startingPrice || !duration)
       return res.status(400).json({ message: "Missing required fields" });
 
+    // Get seller avatar
+    const seller = await User.findById(req.user.id).select("avatar");
+
     const auction = await Auction.create({
       title,
       description: description || "",
@@ -957,6 +968,7 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       endsAt: Date.now() + Number(duration) * 1000,
       sellerId: req.user.id,
       sellerName: req.user.username,
+      sellerAvatar: seller?.avatar || "",
       bids: [],
     });
 
@@ -965,7 +977,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       type: "created",
       message: `✅ Your auction "${title}" has been posted!`,
     });
-
     io.emit("auctionCreated", auction);
     res.status(201).json({ message: "Auction created", auction });
   } catch (err) {
@@ -974,7 +985,7 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
   }
 });
 
-/* PLACE BID — with transaction recording */
+/* PLACE BID with transaction recording */
 app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
   try {
     const { bidAmount } = req.body;
@@ -989,16 +1000,15 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
 
     const amount = Number(bidAmount);
     if (amount <= auction.currentBid)
-      return res.status(400).json({
-        message: `Bid must be higher than ₱${auction.currentBid}`,
-      });
+      return res
+        .status(400)
+        .json({ message: `Bid must be higher than ₱${auction.currentBid}` });
 
     const bidder = await User.findById(req.user.id);
     if (!bidder) return res.status(404).json({ message: "User not found" });
     if (bidder.walletBalance < amount)
       return res.status(400).json({ message: "Insufficient wallet balance" });
 
-    // Refund previous highest bidder
     if (auction.bids.length > 0) {
       const lastBid = auction.bids[auction.bids.length - 1];
       const refundedUser = await User.findByIdAndUpdate(
@@ -1022,14 +1032,11 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
       });
     }
 
-    // Deduct from bidder
     const updatedBidder = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: -amount } },
       { new: true },
     );
-
-    // Record bid transaction
     await Transaction.create({
       userId: req.user.id,
       type: "debit",
@@ -1052,7 +1059,7 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
     await Notification.create({
       userId: auction.sellerId,
       type: "bid",
-      message: `💰 ${req.user.username} placed a bid of ₱${amount} on "${auction.title}"`,
+      message: `💰 ${req.user.username} bid ₱${amount} on "${auction.title}"`,
     });
 
     io.emit("bidPlaced", {
@@ -1061,7 +1068,6 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
       bidderName: req.user.username,
       bids: auction.bids.length,
     });
-
     res.json({ message: "Bid placed", auction });
   } catch (err) {
     console.error("Bid error:", err);
@@ -1069,19 +1075,20 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
   }
 });
 
-/* BUY NOW */
+/* BUY NOW — emits auctionEnded so all clients remove it from feed */
 app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
     if (!auction) return res.status(404).json({ message: "Auction not found" });
     if (auction.status === "ended")
-      return res.status(400).json({ message: "Auction has ended" });
+      return res.status(400).json({ message: "Auction has already ended" });
     if (!auction.buyNowPrice)
       return res.status(400).json({ message: "No Buy Now price set" });
     if (auction.sellerId.toString() === req.user.id)
       return res.status(400).json({ message: "Cannot buy your own auction" });
 
     const buyer = await User.findById(req.user.id);
+    if (!buyer) return res.status(404).json({ message: "User not found" });
     if (buyer.walletBalance < auction.buyNowPrice)
       return res.status(400).json({ message: "Insufficient wallet balance" });
 
@@ -1112,27 +1119,35 @@ app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
       type: "won",
       message: `🎉 ${req.user.username} bought "${auction.title}" for ₱${auction.buyNowPrice}!`,
     });
+    await Notification.create({
+      userId: req.user.id,
+      type: "won",
+      message: `🎉 You bought "${auction.title}" for ₱${auction.buyNowPrice}!`,
+    });
 
-    res.json({ message: "Purchase successful", auction });
+    // Tell all clients to remove this auction from their feed
+    io.emit("auctionEnded", {
+      auctionId: auction._id.toString(),
+      reason: "buynow",
+      buyerName: req.user.username,
+    });
+
+    res.status(200).json({ message: "Purchase successful", auction });
   } catch (err) {
+    console.error("Buy now error:", err);
     res.status(500).json({ message: "Buy Now failed" });
   }
 });
 
-/* LIKE AUCTION */
 app.post("/api/auctions/:id/like", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
     if (!auction) return res.status(404).json({ message: "Auction not found" });
-
     const userId = mongoose.Types.ObjectId.createFromHexString(req.user.id);
     const liked = auction.likes.some((l) => l.toString() === req.user.id);
-
-    if (liked) {
+    if (liked)
       auction.likes = auction.likes.filter((l) => l.toString() !== req.user.id);
-    } else {
-      auction.likes.push(userId);
-    }
+    else auction.likes.push(userId);
     await auction.save();
     res.json({ liked: !liked, likeCount: auction.likes.length });
   } catch (err) {
@@ -1140,7 +1155,6 @@ app.post("/api/auctions/:id/like", authMiddleware, async (req, res) => {
   }
 });
 
-/* ADD COMMENT */
 app.post("/api/auctions/:id/comment", authMiddleware, async (req, res) => {
   try {
     const { text } = req.body;
@@ -1148,7 +1162,6 @@ app.post("/api/auctions/:id/comment", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Comment cannot be empty" });
     const auction = await Auction.findById(req.params.id);
     if (!auction) return res.status(404).json({ message: "Auction not found" });
-
     auction.comments.push({
       userId: req.user.id,
       username: req.user.username,
@@ -1161,18 +1174,14 @@ app.post("/api/auctions/:id/comment", authMiddleware, async (req, res) => {
   }
 });
 
-/* WATCHLIST TOGGLE */
 app.post("/api/auctions/:id/watch", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     const auctionId = req.params.id;
     const watching = user.watchlist.some((w) => w.toString() === auctionId);
-
-    if (watching) {
+    if (watching)
       user.watchlist = user.watchlist.filter((w) => w.toString() !== auctionId);
-    } else {
-      user.watchlist.push(auctionId);
-    }
+    else user.watchlist.push(auctionId);
     await user.save();
     res.json({ watching: !watching });
   } catch (err) {
@@ -1180,7 +1189,6 @@ app.post("/api/auctions/:id/watch", authMiddleware, async (req, res) => {
   }
 });
 
-/* GET WATCHLIST */
 app.get("/api/watchlist", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate("watchlist");
@@ -1190,7 +1198,6 @@ app.get("/api/watchlist", authMiddleware, async (req, res) => {
   }
 });
 
-/* AUCTION BID HISTORY */
 app.get("/api/auctions/:id/bids", async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id).select(
@@ -1207,7 +1214,6 @@ app.get("/api/auctions/:id/bids", async (req, res) => {
   }
 });
 
-/* DELETE AUCTION */
 app.delete("/api/auctions/:id", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -1221,7 +1227,6 @@ app.delete("/api/auctions/:id", authMiddleware, async (req, res) => {
   }
 });
 
-/* EDIT AUCTION */
 app.put("/api/auctions/:id", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -1232,23 +1237,20 @@ app.put("/api/auctions/:id", authMiddleware, async (req, res) => {
       return res
         .status(400)
         .json({ message: "Cannot edit auction with existing bids" });
-
     const { title, description, category } = req.body;
     if (title) auction.title = title;
     if (description) auction.description = description;
     if (category) auction.category = category;
     await auction.save();
-
     res.json({ message: "Auction updated", auction });
   } catch (err) {
     res.status(500).json({ message: "Failed to update auction" });
   }
 });
 
-/* ==============================
-   MESSAGING ROUTES
-============================== */
-
+/* ══════════════════════════════
+   MESSAGES
+══════════════════════════════ */
 const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1261,15 +1263,15 @@ const getConversations = async (req, res) => {
 
     const convMap = {};
     for (const msg of messages) {
-      const senderIdStr = msg.senderId._id
+      const senderIdStr = msg.senderId?._id
         ? msg.senderId._id.toString()
-        : msg.senderId.toString();
-      const receiverIdStr = msg.receiverId._id
+        : msg.senderId?.toString();
+      const receiverIdStr = msg.receiverId?._id
         ? msg.receiverId._id.toString()
-        : msg.receiverId.toString();
-
+        : msg.receiverId?.toString();
       const partner = senderIdStr === userId ? msg.receiverId : msg.senderId;
-      const key = partner._id ? partner._id.toString() : partner.toString();
+      const key = partner?._id ? partner._id.toString() : partner?.toString();
+      if (!key) continue;
 
       if (!convMap[key]) {
         convMap[key] = {
@@ -1280,18 +1282,14 @@ const getConversations = async (req, res) => {
           avatar: partner.avatar || "",
           partnerPic: partner.avatar || "",
           lastMessage:
-            msg.message ||
-            (msg.messageType === "image" ? "📷 Image" : "📍 Location"),
+            msg.message || (msg.messageType === "image" ? "📷 Image" : ""),
           lastMsgTime: msg.createdAt,
           lastTime: msg.createdAt,
           unread: 0,
         };
       }
-      if (!msg.read && receiverIdStr === userId) {
-        convMap[key].unread++;
-      }
+      if (!msg.read && receiverIdStr === userId) convMap[key].unread++;
     }
-
     res.json(Object.values(convMap));
   } catch (err) {
     console.error("Conversations error:", err);
@@ -1302,7 +1300,6 @@ const getConversations = async (req, res) => {
 app.get("/api/messages", authMiddleware, getConversations);
 app.get("/api/messages/conversations", authMiddleware, getConversations);
 
-/* GET MESSAGES WITH A SPECIFIC USER */
 app.get("/api/messages/:userId", authMiddleware, async (req, res) => {
   try {
     const myId = req.user.id;
@@ -1313,19 +1310,16 @@ app.get("/api/messages/:userId", authMiddleware, async (req, res) => {
         { senderId: theirId, receiverId: myId },
       ],
     }).sort({ createdAt: 1 });
-
     await Message.updateMany(
       { senderId: theirId, receiverId: myId, read: false },
       { read: true },
     );
-
     res.json(messages);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch messages" });
   }
 });
 
-/* SEND MESSAGE (REST fallback) */
 app.post("/api/messages", authMiddleware, async (req, res) => {
   try {
     const { receiverId, message, messageType, imageUrl, location } = req.body;
@@ -1335,6 +1329,7 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
     const msg = await Message.create({
       senderId: req.user.id,
       receiverId,
+      senderName: req.user.username,
       message: message || "",
       messageType: messageType || "text",
       imageUrl: imageUrl || "",
@@ -1356,14 +1351,12 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
         senderId: req.user.id,
       });
     }
-
     res.status(201).json(msg);
   } catch (err) {
     res.status(500).json({ message: "Failed to send message" });
   }
 });
 
-/* SEND MESSAGE WITH IMAGE */
 app.post(
   "/api/messages/image",
   authMiddleware,
@@ -1373,23 +1366,21 @@ app.post(
       const { receiverId } = req.body;
       if (!receiverId || !req.file)
         return res.status(400).json({ message: "Receiver and image required" });
-
       const imageUrl = `/uploads/${req.file.filename}`;
       const msg = await Message.create({
         senderId: req.user.id,
         receiverId,
+        senderName: req.user.username,
         messageType: "image",
         imageUrl,
       });
-
       const receiverSocketId = onlineUsers[receiverId];
-      if (receiverSocketId) {
+      if (receiverSocketId)
         io.to(receiverSocketId).emit("newMessage", {
           ...msg.toObject(),
           senderName: req.user.username,
           senderId: req.user.id,
         });
-      }
       res.status(201).json(msg);
     } catch (err) {
       res.status(500).json({ message: "Failed to send image message" });
@@ -1397,15 +1388,13 @@ app.post(
   },
 );
 
-/* ==============================
-   REVIEW ROUTES
-============================== */
-
-const submitReview = async (req, res) => {
+/* ══════════════════════════════
+   REVIEWS
+══════════════════════════════ */
+const submitReviewHandler = async (req, res) => {
   try {
     const targetUserId = req.params.userId || req.body.targetUserId;
     const { rating, comment, auctionId } = req.body;
-
     if (!targetUserId || !rating || !comment)
       return res.status(400).json({ message: "All fields required" });
     if (targetUserId === req.user.id)
@@ -1419,7 +1408,7 @@ const submitReview = async (req, res) => {
     if (existing)
       return res
         .status(400)
-        .json({ message: "You already reviewed this user for this auction" });
+        .json({ message: "You already reviewed this user" });
 
     const review = await Review.create({
       reviewerId: req.user.id,
@@ -1429,28 +1418,25 @@ const submitReview = async (req, res) => {
       comment,
       auctionId: auctionId || null,
     });
-
     await Notification.create({
       userId: targetUserId,
       type: "review",
       message: `⭐ ${req.user.username} left you a ${rating}-star review!`,
     });
-
     res.status(201).json({ message: "Review submitted", review });
   } catch (err) {
     res.status(500).json({ message: "Failed to submit review" });
   }
 };
 
-app.post("/api/reviews", authMiddleware, submitReview);
-app.post("/api/reviews/:userId", authMiddleware, submitReview);
+app.post("/api/reviews", authMiddleware, submitReviewHandler);
+app.post("/api/reviews/:userId", authMiddleware, submitReviewHandler);
 
-/* GET REVIEWS FOR USER */
 app.get("/api/reviews/:userId", async (req, res) => {
   try {
-    const reviews = await Review.find({
-      targetUserId: req.params.userId,
-    }).sort({ createdAt: -1 });
+    const reviews = await Review.find({ targetUserId: req.params.userId }).sort(
+      { createdAt: -1 },
+    );
     const avg = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : 0;
@@ -1460,10 +1446,9 @@ app.get("/api/reviews/:userId", async (req, res) => {
   }
 });
 
-/* ==============================
-   NOTIFICATION ROUTES
-============================== */
-
+/* ══════════════════════════════
+   NOTIFICATIONS
+══════════════════════════════ */
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
     const notifs = await Notification.find({ userId: req.user.id })
@@ -1496,15 +1481,12 @@ app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   }
 });
 
-/* ==============================
-   STORY ROUTES
-============================== */
-
+/* ══════════════════════════════
+   STORIES
+══════════════════════════════ */
 app.get("/api/stories", async (req, res) => {
   try {
-    const stories = await Story.find({
-      expiresAt: { $gt: new Date() },
-    })
+    const stories = await Story.find({ expiresAt: { $gt: new Date() } })
       .sort({ createdAt: -1 })
       .limit(30);
     res.json(stories);
@@ -1518,13 +1500,11 @@ app.post("/api/stories", authMiddleware, async (req, res) => {
     const { text, imageUrl } = req.body;
     if (!text && !imageUrl)
       return res.status(400).json({ message: "Add text or an image" });
-
     const story = await Story.create({
       userId: req.user.id,
       username: req.user.username,
       text: text || "",
       imageUrl: imageUrl || "",
-      isLive: false,
     });
     res.status(201).json(story);
   } catch (err) {
@@ -1543,40 +1523,30 @@ app.post("/api/stories/:id/view", authMiddleware, async (req, res) => {
   }
 });
 
-/* ==============================
-   ANALYTICS ROUTES
-============================== */
-
+/* ══════════════════════════════
+   ANALYTICS
+══════════════════════════════ */
 app.get("/api/analytics", authMiddleware, async (req, res) => {
   try {
     const myAuctions = await Auction.find({ sellerId: req.user.id });
-    const totalListings = myAuctions.length;
-    const activeListings = myAuctions.filter(
-      (a) => a.status === "active",
-    ).length;
-    const endedListings = myAuctions.filter((a) => a.status === "ended").length;
-    const totalBidsReceived = myAuctions.reduce((s, a) => s + a.bids.length, 0);
-    const totalRevenue = myAuctions
-      .filter((a) => a.status === "ended" && a.bids.length > 0)
-      .reduce((s, a) => s + a.currentBid, 0);
-    const totalLikes = myAuctions.reduce((s, a) => s + a.likes.length, 0);
-
     res.json({
-      totalListings,
-      activeListings,
-      endedListings,
-      totalBidsReceived,
-      totalRevenue,
-      totalLikes,
+      totalListings: myAuctions.length,
+      activeListings: myAuctions.filter((a) => a.status === "active").length,
+      endedListings: myAuctions.filter((a) => a.status === "ended").length,
+      totalBidsReceived: myAuctions.reduce((s, a) => s + a.bids.length, 0),
+      totalRevenue: myAuctions
+        .filter((a) => a.status === "ended" && a.bids.length > 0)
+        .reduce((s, a) => s + a.currentBid, 0),
+      totalLikes: myAuctions.reduce((s, a) => s + a.likes.length, 0),
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch analytics" });
   }
 });
 
-/* ==============================
-   ADMIN: RESET
-============================== */
+/* ══════════════════════════════
+   ADMIN
+══════════════════════════════ */
 app.delete("/api/auctions/reset", async (req, res) => {
   try {
     await Auction.deleteMany({});
@@ -1586,10 +1556,10 @@ app.delete("/api/auctions/reset", async (req, res) => {
   }
 });
 
-/* ==============================
+/* ══════════════════════════════
    SOCKET.IO
-============================== */
-const onlineUsers = {}; // userId → socketId
+══════════════════════════════ */
+const onlineUsers = {};
 
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
@@ -1599,10 +1569,9 @@ io.on("connection", (socket) => {
     onlineUsers[userId] = socket.id;
     socket.userId = userId;
     socket.join(userId);
-    console.log(`👤 User ${userId} online`);
-
     socket.broadcast.emit("userOnline", userId);
     socket.emit("onlineUsers", Object.keys(onlineUsers));
+    console.log(`👤 User ${userId} online`);
   });
 
   socket.on(
@@ -1610,7 +1579,6 @@ io.on("connection", (socket) => {
     async ({ to, from, message, imageUrl, messageType }) => {
       try {
         if (!to || !from) return;
-
         const msg = await Message.create({
           senderId: from,
           receiverId: to,
@@ -1619,24 +1587,25 @@ io.on("connection", (socket) => {
           imageUrl: imageUrl || "",
           read: false,
         });
-
         const sender = await User.findById(from).select("username avatar");
-
         const payload = {
           ...msg.toObject(),
           senderName: sender?.username || "User",
           senderId: from,
         };
-
         io.to(to).emit("newMessage", payload);
         socket.emit("messageSent", payload);
-
         await Notification.create({
           userId: to,
           type: "message",
           message: `💬 ${sender?.username || "Someone"} sent you a message`,
           link: `chat:${from}`,
         }).catch(() => {});
+
+        // Update senderName in the doc
+        await Message.findByIdAndUpdate(msg._id, {
+          senderName: sender?.username || "User",
+        });
       } catch (err) {
         console.error("[Socket] sendMessage error:", err.message);
         socket.emit("messageError", { error: "Failed to send message" });
@@ -1647,7 +1616,6 @@ io.on("connection", (socket) => {
   socket.on("typing", ({ to, from, username }) => {
     io.to(to).emit("typing", { from, username });
   });
-
   socket.on("stopTyping", ({ to, from }) => {
     io.to(to).emit("stopTyping", { from });
   });
@@ -1657,15 +1625,14 @@ io.on("connection", (socket) => {
     if (userId) {
       delete onlineUsers[userId];
       socket.broadcast.emit("userOffline", userId);
-      console.log(`👤 User ${userId} offline`);
     }
     console.log("🔌 Socket disconnected:", socket.id);
   });
 });
 
-/* ==============================
-   START SERVER
-============================== */
+/* ══════════════════════════════
+   START
+══════════════════════════════ */
 server.listen(PORT, () => {
   console.log(`🚀 BiliBid server running on port ${PORT}`);
 });
