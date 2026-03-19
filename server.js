@@ -7,47 +7,97 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
-const fs = require("fs");
 const http = require("http");
 const { Server } = require("socket.io");
+
+// ── Cloudinary ────────────────────────────────────────────────
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const app = express();
 const server = http.createServer(app);
 
+// ── Socket.IO ─────────────────────────────────────────────────
+// FIX: polling first so Render's reverse-proxy handshake succeeds,
+// then upgrades to WebSocket.  Ping settings prevent 30-s idle drop.
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ["websocket", "polling"],
+  transports: ["polling", "websocket"],
+  pingInterval: 25_000,
+  pingTimeout: 20_000,
+  allowEIO3: true,
 });
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "bilibid_secret_key";
 
-app.use(cors({ origin: "*" }));
+// ── CORS ──────────────────────────────────────────────────────
+// Accept a comma-separated FRONTEND_URL list, or fall back to "*"
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map((s) => s.trim())
+  : "*";
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// NOTE: /uploads static route removed — files are now served from
+// Cloudinary's CDN, not from Render's ephemeral disk.
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+// ── Multer → Cloudinary storage ───────────────────────────────
+// All uploads go straight to Cloudinary.  req.files[n].path holds
+// the full https://res.cloudinary.com/... URL to store in MongoDB.
+
+const auctionImageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "bilibid/auctions",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ quality: "auto", fetch_format: "auto" }],
   },
 });
-const upload = multer({
-  storage,
+
+const avatarStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "bilibid/avatars",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [
+      { width: 400, height: 400, crop: "fill", quality: "auto" },
+    ],
+  },
+});
+
+const storyImageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "bilibid/stories",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ quality: "auto", fetch_format: "auto" }],
+  },
+});
+
+const uploadImages = multer({
+  storage: auctionImageStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only image files are allowed"));
-  },
+});
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+const uploadStory = multer({
+  storage: storyImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+// ── Auth middleware ───────────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Unauthorized" });
@@ -59,7 +109,7 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-/* ── MongoDB — dbName forces correct database regardless of URI ── */
+/* ── MongoDB ── */
 console.log("MONGO_URI:", process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"));
 mongoose.set("strictQuery", true);
 mongoose
@@ -312,8 +362,9 @@ app.get("/api/debug", (req, res) => {
     db: mongoose.connection.db?.databaseName,
     host: mongoose.connection.host,
     readyState: mongoose.connection.readyState,
-    version: "v5-bilibid",
+    version: "v5.1-bilibid",
     mongoUri: process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"),
+    cloudinary: process.env.CLOUDINARY_CLOUD_NAME || "not configured",
   });
 });
 
@@ -326,26 +377,33 @@ app.get("/", (req, res) => {
 
 /* ══════════════════════════════
    UPLOADS
+   Images are stored on Cloudinary.
+   The response returns full https:// URLs — no IMAGE_BASE prefix needed.
 ══════════════════════════════ */
+
+// General image upload (auction photos, chat images, story images)
+// Uses uploadImages storage (bilibid/auctions folder on Cloudinary)
 app.post(
   "/api/upload",
   authMiddleware,
-  upload.array("images", 5),
+  uploadImages.array("images", 5),
   (req, res) => {
     if (!req.files?.length)
       return res.status(400).json({ message: "No files uploaded" });
-    const urls = req.files.map((f) => `/uploads/${f.filename}`);
+    // STEP 8: store full Cloudinary URL (file.path), not filename
+    const urls = req.files.map((f) => f.path);
     res.json({ urls });
   },
 );
 
+// Profile picture upload (kept for backward compatibility)
 app.post(
   "/api/upload/profile",
   authMiddleware,
-  upload.single("profilePic"),
+  uploadAvatar.single("profilePic"),
   (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-    res.json({ url: `/uploads/${req.file.filename}` });
+    res.json({ url: req.file.path });
   },
 );
 
@@ -676,7 +734,7 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-/* GET suggested sellers — real users with most listings */
+/* GET suggested sellers — real users with most active listings */
 app.get("/api/users/suggested", async (req, res) => {
   try {
     const myId = req.headers.authorization
@@ -692,7 +750,6 @@ app.get("/api/users/suggested", async (req, res) => {
         })()
       : null;
 
-    // Get users with most active auctions
     const topSellers = await Auction.aggregate([
       { $match: { status: "active" } },
       {
@@ -776,7 +833,6 @@ app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
   try {
     let targetId = req.params.id;
 
-    // If not a valid ObjectId, try to find by username
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       const found = await User.findOne({
         username: { $regex: `^${targetId}$`, $options: "i" },
@@ -838,15 +894,17 @@ app.delete("/api/users/:id/follow", authMiddleware, async (req, res) => {
   }
 });
 
+/* Avatar upload — now goes to Cloudinary */
 app.post(
   "/api/users/upload-avatar",
   authMiddleware,
-  upload.single("avatar"),
+  uploadAvatar.single("avatar"),
   async (req, res) => {
     try {
       if (!req.file)
         return res.status(400).json({ message: "No file uploaded" });
-      const avatarUrl = `/uploads/${req.file.filename}`;
+      // file.path is the full Cloudinary URL
+      const avatarUrl = req.file.path;
       await User.findByIdAndUpdate(req.user.id, { avatar: avatarUrl });
       res.json({ avatarUrl });
     } catch (err) {
@@ -950,7 +1008,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
     if (!title || !startingPrice || !duration)
       return res.status(400).json({ message: "Missing required fields" });
 
-    // Get seller avatar
     const seller = await User.findById(req.user.id).select("avatar");
 
     const auction = await Auction.create({
@@ -960,6 +1017,7 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       condition: condition || "",
       shipping: shipping || "",
       location: location || "",
+      // Images are now full Cloudinary URLs passed from the client
       images: images || [],
       startingPrice: Number(startingPrice),
       currentBid: Number(startingPrice),
@@ -1125,7 +1183,6 @@ app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
       message: `🎉 You bought "${auction.title}" for ₱${auction.buyNowPrice}!`,
     });
 
-    // Tell all clients to remove this auction from their feed
     io.emit("auctionEnded", {
       auctionId: auction._id.toString(),
       reason: "buynow",
@@ -1357,16 +1414,18 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
   }
 });
 
+// Image message upload — now uses Cloudinary
 app.post(
   "/api/messages/image",
   authMiddleware,
-  upload.single("image"),
+  uploadImages.single("image"),
   async (req, res) => {
     try {
       const { receiverId } = req.body;
       if (!receiverId || !req.file)
         return res.status(400).json({ message: "Receiver and image required" });
-      const imageUrl = `/uploads/${req.file.filename}`;
+      // file.path is the full Cloudinary URL
+      const imageUrl = req.file.path;
       const msg = await Message.create({
         senderId: req.user.id,
         receiverId,
@@ -1601,8 +1660,6 @@ io.on("connection", (socket) => {
           message: `💬 ${sender?.username || "Someone"} sent you a message`,
           link: `chat:${from}`,
         }).catch(() => {});
-
-        // Update senderName in the doc
         await Message.findByIdAndUpdate(msg._id, {
           senderName: sender?.username || "User",
         });
@@ -1635,4 +1692,7 @@ io.on("connection", (socket) => {
 ══════════════════════════════ */
 server.listen(PORT, () => {
   console.log(`🚀 BiliBid server running on port ${PORT}`);
+  console.log(
+    `☁️  Cloudinary cloud: ${process.env.CLOUDINARY_CLOUD_NAME || "⚠️  not configured"}`,
+  );
 });
