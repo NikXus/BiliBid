@@ -107,8 +107,13 @@ const uploadImages = multer({
   storage: memStorage,
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
   fileFilter: (_req, file, cb) => {
-    if (/^image\/(jpe?g|png|gif|webp)$/.test(file.mimetype)) cb(null, true);
-    else cb(new Error("Only image files (jpg, png, gif, webp) are allowed"));
+    // Accept anything the browser calls an "image/*"
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      // This error message is passed to multerErrorHandler → client sees it
+      cb(new Error(`Unsupported file type "${file.mimetype}". Please upload an image.`));
+    }
   },
 });
 
@@ -157,16 +162,23 @@ function uploadToCloudinary(buffer, options = {}) {
 function multerErrorHandler(err, req, res, next) {
   if (err instanceof multer.MulterError) {
     const messages = {
-      LIMIT_FILE_SIZE: "File too large (max 5 MB per file)",
-      LIMIT_FILE_COUNT: "Too many files (max 5)",
-      LIMIT_UNEXPECTED_FILE: "Unexpected field name in upload",
+      LIMIT_FILE_SIZE:       "File too large — max 5 MB per image.",
+      LIMIT_FILE_COUNT:      "Too many files — max 5 at a time.",
+      // This fires when the client sends a field named "image" (singular)
+      // but the route expects "images" (plural).  The field name in
+      // fd.append() on the client MUST match the name in .array() / .single().
+      LIMIT_UNEXPECTED_FILE: `Unexpected form field "${err.field}". Expected "images".`,
     };
+    console.error("[multerErrorHandler] MulterError:", err.code, err.field);
     return res.status(400).json({ message: messages[err.code] || err.message });
   }
+
   if (err) {
-    // Custom fileFilter errors or Cloudinary errors
-    return res.status(400).json({ message: err.message || "Upload error" });
+    // Custom fileFilter errors land here (e.g. unsupported MIME type)
+    console.error("[multerErrorHandler] Upload error:", err.message);
+    return res.status(400).json({ message: err.message || "Upload failed." });
   }
+
   next();
 }
 
@@ -462,18 +474,33 @@ app.get("/", (req, res) => {
 app.post(
   "/api/upload",
   authMiddleware,
+  // Step 1 — run multer, forward any parse/filter error to our handler
   (req, res, next) => {
-    // Run multer, then pass control to our error handler
     uploadImages.array("images", 5)(req, res, (err) => {
       if (err) return multerErrorHandler(err, req, res, next);
       next();
     });
   },
+  // Step 2 — at this point multer has parsed the body successfully
   async (req, res) => {
-    console.log("[/api/upload] called, files:", req.files?.length ?? 0);
+    // ── DEBUG: log what multer actually found ───────────────────────────────
+    // If req.files is empty here despite the client sending a file, the most
+    // common causes are:
+    //   (a) Wrong field name on the client (must be "images", not "image")
+    //   (b) Content-Type header was set manually, stripping the boundary
+    //   (c) The request was sent as JSON instead of multipart/form-data
+    console.log(
+      "[/api/upload] req.files:",
+      req.files?.map((f) => `${f.fieldname}/${f.mimetype} ${f.size}B`)
+    );
 
     if (!req.files?.length) {
-      return res.status(400).json({ message: "No files uploaded" });
+      // Return a message the frontend can display directly in a toast
+      return res.status(400).json({
+        message:
+          'No files received. Ensure the FormData field is named "images" ' +
+          'and that Content-Type is NOT set manually in the fetch call.',
+      });
     }
 
     try {
@@ -481,21 +508,19 @@ app.post(
         uploadToCloudinary(file.buffer, {
           folder: "bilibid/auctions",
           transformation: [{ quality: "auto", fetch_format: "auto" }],
-        }),
+        })
       );
 
       const results = await Promise.all(uploadPromises);
       const urls = results.map((r) => r.secure_url);
 
-      console.log("[/api/upload] success, urls:", urls);
+      console.log("[/api/upload] success →", urls);
       return res.json({ urls });
     } catch (err) {
       console.error("[/api/upload] Cloudinary error:", err.message);
-      return res
-        .status(500)
-        .json({ message: "Image upload failed: " + err.message });
+      return res.status(500).json({ message: "Image upload failed: " + err.message });
     }
-  },
+  }
 );
 
 /**
