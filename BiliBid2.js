@@ -1,25 +1,82 @@
 // ============================================================
-//  BiliBid2.js  v5.0
+//  BiliBid2.js  v5.1
 //  Fixes: guest mode, photo collage, buy-now feed removal,
 //  real suggested sellers, messaging usernames, logout reset
+//
+//  CHANGES from v5.0:
+//    1. [FIX] Socket: transport order changed to polling-first so
+//       the initial handshake succeeds through Render's proxy,
+//       then upgrades to WebSocket.  Ping interval added to
+//       keep the connection alive past Render's 30-s idle timeout.
+//
+//    2. [FIX] Images: IMAGE_BASE prefix is no longer prepended to
+//       URLs that are already absolute (Cloudinary URLs start with
+//       https://).  A helper imgSrc() handles this transparently
+//       so no template changes are needed in the rest of the code.
+//
+//    3. [FIX] Fallback image shown whenever an <img> fails to load,
+//       so broken-image icons never appear in the UI.
+//
+//    4. [MINOR] Upload response now accepts either the old relative
+//       path format OR the new full Cloudinary URL format.
 // ============================================================
 "use strict";
 
 /* ── 1. CONFIG ── */
-const API_BASE = "https://bilibid-1.onrender.com";
+const API_BASE   = "https://bilibid-1.onrender.com";
 const SOCKET_URL = "https://bilibid-1.onrender.com";
+// IMAGE_BASE is kept for backward-compatibility with any relative
+// paths still stored in older MongoDB documents.  New uploads via
+// Cloudinary return full https:// URLs and do NOT need this prefix.
 const IMAGE_BASE = "https://bilibid-1.onrender.com";
 
+/* ── 1a. IMAGE HELPER ───────────────────────────────────────────
+   Returns a fully-qualified image URL regardless of whether the
+   stored value is:
+     • a Cloudinary URL   "https://res.cloudinary.com/..."
+     • an absolute URL    "https://example.com/..."
+     • a legacy path      "/uploads/abc.jpg"
+────────────────────────────────────────────────────────────── */
+function imgSrc(path) {
+  if (!path) return "";
+  // Already a full URL — use as-is
+  if (/^https?:\/\//i.test(path)) return path;
+  // Legacy relative path — prepend IMAGE_BASE
+  return IMAGE_BASE + path;
+}
+
+/* ── 1b. GLOBAL IMG FALLBACK ────────────────────────────────────
+   Attach once to <body>.  Any <img> that fails to load anywhere
+   in the app gets replaced with an SVG placeholder — no broken
+   image icons ever visible to the user.
+────────────────────────────────────────────────────────────── */
+document.addEventListener(
+  "error",
+  (e) => {
+    if (e.target.tagName !== "IMG") return;
+    if (e.target.dataset.fallback) return; // prevent infinite loop
+    e.target.dataset.fallback = "1";
+    e.target.src =
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' " +
+      "width='120' height='120' viewBox='0 0 120 120'%3E" +
+      "%3Crect width='120' height='120' fill='%23172944'/%3E" +
+      "%3Ctext x='60' y='66' font-size='36' text-anchor='middle' " +
+      "font-family='sans-serif' fill='%2364748b'%3E%F0%9F%8F%B7%EF%B8%8F%3C/text%3E" +
+      "%3C/svg%3E";
+  },
+  true // capture phase — fires before bubbling so it catches every img
+);
+
 /* ── 2. AUTH HELPERS ── */
-const getToken = () => localStorage.getItem("bbToken") || "";
-const getUserId = () => localStorage.getItem("bbUserId") || "";
+const getToken    = () => localStorage.getItem("bbToken")    || "";
+const getUserId   = () => localStorage.getItem("bbUserId")   || "";
 const getUsername = () => localStorage.getItem("bbUsername") || "";
 
 function setAuth(token, id, username, avatar = "") {
-  localStorage.setItem("bbToken", token);
-  localStorage.setItem("bbUserId", id);
+  localStorage.setItem("bbToken",    token);
+  localStorage.setItem("bbUserId",   id);
   localStorage.setItem("bbUsername", username);
-  localStorage.setItem("bbAvatar", avatar);
+  localStorage.setItem("bbAvatar",   avatar);
 }
 function clearAuth() {
   ["bbToken", "bbUserId", "bbUsername", "bbAvatar"].forEach((k) =>
@@ -74,11 +131,25 @@ function initSocket() {
   }
 
   socket = io(SOCKET_URL, {
-    transports: ["websocket", "polling"],
+    // ── FIX: polling first, then upgrade to WebSocket ────────
+    // Render's reverse proxy requires the HTTP polling handshake
+    // to succeed before a WebSocket upgrade is attempted.
+    // The OLD order ["websocket", "polling"] caused the timeout
+    // because the raw WS upgrade was dropped by the proxy on cold
+    // connections before the session was established.
+    transports: ["polling", "websocket"],
+
+    // ── Keepalive — prevents Render's 30-s idle disconnect ───
+    // Socket.io's client-side ping fires every 25 s so the server
+    // always sees activity before the 30-s window expires.
+    // These MUST align with the server's pingInterval/pingTimeout.
+    pingInterval: 25_000,
+    pingTimeout:  20_000,
+
     reconnection: true,
     reconnectionAttempts: Infinity,
-    reconnectionDelay: 1500,
-    reconnectionDelayMax: 10000,
+    reconnectionDelay: 1_500,
+    reconnectionDelayMax: 10_000,
     withCredentials: false,
   });
 
@@ -88,8 +159,9 @@ function initSocket() {
     if (uid) socket.emit("join", uid);
   });
   socket.on("disconnect", (reason) => {
+    console.log("[Socket] Disconnected:", reason);
     if (reason === "io server disconnect")
-      setTimeout(() => socket.connect(), 1000);
+      setTimeout(() => socket.connect(), 1_000);
   });
   socket.on("connect_error", (err) =>
     console.error("[Socket] Error:", err.message),
@@ -147,7 +219,7 @@ function initSocket() {
     if (currentChatUserId === senderIdStr) {
       const content =
         msg.messageType === "image"
-          ? `<img src="${IMAGE_BASE}${msg.imageUrl}" class="chat-img-preview" onclick="openImg('${IMAGE_BASE}${msg.imageUrl}')">`
+          ? `<img src="${imgSrc(msg.imageUrl)}" class="chat-img-preview" onclick="openImg('${imgSrc(msg.imageUrl)}')">`
           : escapeHtml(msg.message);
       appendChatMsg(
         "them",
@@ -408,7 +480,7 @@ function renderStoriesBar() {
     .map((s, i) => {
       const av = (s.username || "U").slice(0, 2).toUpperCase();
       const inner = s.imageUrl
-        ? `<img src="${IMAGE_BASE}${s.imageUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        ? `<img src="${imgSrc(s.imageUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
         : av;
       return `<div class="story-item" onclick="openStory(${i})">
       <div class="story-ring${s.isLive ? " live-ring" : ""}"><div class="story-inner">${inner}</div></div>
@@ -434,7 +506,7 @@ function openStory(i) {
   const cnt = document.getElementById("svContent");
   if (cnt) {
     if (s.imageUrl)
-      cnt.innerHTML = `<img src="${IMAGE_BASE}${s.imageUrl}" style="max-width:100%;max-height:70vh;border-radius:16px;object-fit:contain">`;
+      cnt.innerHTML = `<img src="${imgSrc(s.imageUrl)}" style="max-width:100%;max-height:70vh;border-radius:16px;object-fit:contain">`;
     else
       cnt.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:300px;font-size:22px;color:var(--text);text-align:center;padding:40px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(245,158,11,.1));border-radius:20px;border:1px solid var(--border)">${escapeHtml(s.text || "")}</div>`;
   }
@@ -523,10 +595,10 @@ async function handleStoryImgUpload(input) {
     });
     const data = await res.json();
     if (data.urls?.length) {
-      uploadedStoryUrl = data.urls[0];
+      uploadedStoryUrl = data.urls[0]; // now a full Cloudinary URL
       const pi = document.getElementById("storyImgPreview");
       if (pi)
-        pi.innerHTML = `<img src="${IMAGE_BASE}${uploadedStoryUrl}" style="max-width:200px;border-radius:12px;margin-top:10px">`;
+        pi.innerHTML = `<img src="${imgSrc(uploadedStoryUrl)}" style="max-width:200px;border-radius:12px;margin-top:10px">`;
     }
   } catch {
     toast("⚠️ Image upload failed", "error");
@@ -637,13 +709,13 @@ function renderFeed() {
 }
 
 /* ── Photo collage builder ── */
-function buildPhotoCollage(images, auctionId) {
+function buildPhotoCollage(images) {
   if (!images?.length)
     return `<span style="font-size:64px;line-height:240px">🏷️</span>`;
 
-  const srcs = images
-    .slice(0, 5)
-    .map((s) => (s.startsWith("http") ? s : `${IMAGE_BASE}${s}`));
+  // FIX: use imgSrc() so Cloudinary URLs are used as-is, legacy
+  // paths still get the IMAGE_BASE prefix automatically.
+  const srcs = images.slice(0, 5).map(imgSrc);
   const n = srcs.length;
   const extra = images.length - 5;
   const openFn = (src) => `onclick="openImg('${src}')"`;
@@ -696,9 +768,11 @@ function buildPost(p) {
       : 0;
   const comments = p.comments || [];
 
-  const collage = buildPhotoCollage(p.images, p._id);
+  const collage = buildPhotoCollage(p.images);
+
+  // FIX: use imgSrc() for seller avatar as well
   const avContent = p.sellerAvatar
-    ? `<img src="${IMAGE_BASE}${p.sellerAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    ? `<img src="${imgSrc(p.sellerAvatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
     : (p.sellerName || "S").slice(0, 2).toUpperCase();
 
   return `<div class="auction-post" id="${p._id}">
@@ -1114,7 +1188,7 @@ async function openUserProfile(userId, username) {
     if (userData.avatar) {
       const avEl = document.getElementById("upAvatar");
       if (avEl)
-        avEl.innerHTML = `<img src="${IMAGE_BASE}${userData.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        avEl.innerHTML = `<img src="${imgSrc(userData.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
     }
     if (userData.isFollowing !== undefined) {
       followedUsers[userId] = userData.isFollowing;
@@ -1310,7 +1384,7 @@ function renderMyAuct(tab) {
       <button class="listing-action-btn" onclick="openUserProfile('${item.winnerId || ""}','${escapeHtml(item.winnerName || "Winner")}')">⭐ Review Buyer</button>`;
       return `<div class="card" style="display:flex;gap:14px;align-items:center;padding:14px">
       <div style="width:56px;height:56px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden">
-        ${item.images?.length ? `<img src="${item.images[0].startsWith("http") ? item.images[0] : IMAGE_BASE + item.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
+        ${item.images?.length ? `<img src="${imgSrc(item.images[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:14px;margin-bottom:2px">${escapeHtml(item.title)}</div>
@@ -1403,7 +1477,7 @@ function renderWatchlist() {
         m = Math.floor((secs % 3600) / 60);
       return `<div class="watchlist-item">
       <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">
-        ${item.images?.length ? `<img src="${item.images[0].startsWith("http") ? item.images[0] : IMAGE_BASE + item.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
+        ${item.images?.length ? `<img src="${imgSrc(item.images[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:14px;margin-bottom:2px">${escapeHtml(item.title)}</div>
@@ -1487,7 +1561,7 @@ function renderWon() {
       (item) => `
     <div class="won-item">
       <div style="width:60px;height:60px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">
-        ${item.images?.length ? `<img src="${item.images[0].startsWith("http") ? item.images[0] : IMAGE_BASE + item.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏆"}
+        ${item.images?.length ? `<img src="${imgSrc(item.images[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏆"}
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:14px;margin-bottom:2px">${escapeHtml(item.title)}</div>
@@ -1867,7 +1941,7 @@ async function loadSuggestedSellers() {
     <div style="background:var(--surface2);border-radius:14px;padding:14px;border:1px solid var(--border);margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div style="width:38px;height:38px;border-radius:50%;background:${hashColor(u.username || "")};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;overflow:hidden;flex-shrink:0;cursor:pointer" onclick="openUserProfile('${u._id}','${escapeHtml(u.username)}')">
-          ${u.avatar ? `<img src="${IMAGE_BASE}${u.avatar}" style="width:100%;height:100%;object-fit:cover">` : u.username.slice(0, 2).toUpperCase()}
+          ${u.avatar ? `<img src="${imgSrc(u.avatar)}" style="width:100%;height:100%;object-fit:cover">` : u.username.slice(0, 2).toUpperCase()}
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;color:var(--gold);font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="openUserProfile('${u._id}','${escapeHtml(u.username)}')">${escapeHtml(u.username)}</div>
@@ -1926,7 +2000,7 @@ async function loadProfile() {
     ].forEach((id) => {
       const el = document.getElementById(id);
       if (el)
-        el.innerHTML = `<img src="${IMAGE_BASE}${data.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        el.innerHTML = `<img src="${imgSrc(data.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
     });
   }
   syncWalletDisplay();
@@ -1998,6 +2072,7 @@ async function saveProfile() {
   }
 }
 
+/* ── uploadAvatar — updated to use imgSrc() ── */
 async function uploadAvatar(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -2010,9 +2085,10 @@ async function uploadAvatar(input) {
       body: fd,
     });
     const data = await res.json();
-    if (data.avatarUrl || data.url) {
-      uploadedAvatarUrl = data.avatarUrl || data.url;
-      const url = `${IMAGE_BASE}${uploadedAvatarUrl}`;
+    const rawUrl = data.avatarUrl || data.url;
+    if (rawUrl) {
+      uploadedAvatarUrl = rawUrl;
+      const url = imgSrc(rawUrl); // handles both absolute and relative
       const imgs = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
       ["profileAvatarLarge", "sidebarAvatarText", "topbarAvatar"].forEach(
         (id) => {
@@ -2020,9 +2096,9 @@ async function uploadAvatar(input) {
           if (el) el.innerHTML = imgs;
         },
       );
-      localStorage.setItem("bbAvatar", uploadedAvatarUrl);
+      localStorage.setItem("bbAvatar", rawUrl);
       toast("✅ Avatar updated!", "success");
-    } else throw new Error("No URL");
+    } else throw new Error("No URL returned");
   } catch (err) {
     toast("⚠️ Avatar upload failed", "error");
   }
@@ -2089,7 +2165,7 @@ async function loadConversations() {
     <div class="conversation-item" onclick="openChatPopup('${t.userId || t.partnerId}','${escapeHtml(t.username || t.partnerName)}')" data-uid="${t.userId || t.partnerId}">
       <div style="position:relative;flex-shrink:0">
         <div style="width:48px;height:48px;border-radius:50%;background:${hashColor(t.username || t.partnerName || "")};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;overflow:hidden">
-          ${t.avatar || t.partnerPic ? `<img src="${IMAGE_BASE}${t.avatar || t.partnerPic}" style="width:100%;height:100%;object-fit:cover">` : (t.username || t.partnerName || "U").slice(0, 2).toUpperCase()}
+          ${t.avatar || t.partnerPic ? `<img src="${imgSrc(t.avatar || t.partnerPic)}" style="width:100%;height:100%;object-fit:cover">` : (t.username || t.partnerName || "U").slice(0, 2).toUpperCase()}
         </div>
         <span class="online-dot" style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:${onlineUsers[t.userId || t.partnerId] ? "var(--online)" : "var(--muted)"};border:2px solid var(--surface2)"></span>
       </div>
@@ -2165,7 +2241,7 @@ async function openChatPopup(userId, username) {
         const name = isMe ? "" : m.senderName || currentChatUsername;
         const content =
           m.messageType === "image"
-            ? `<img src="${IMAGE_BASE}${m.imageUrl}" class="chat-img-preview" onclick="openImg('${IMAGE_BASE}${m.imageUrl}')">`
+            ? `<img src="${imgSrc(m.imageUrl)}" class="chat-img-preview" onclick="openImg('${imgSrc(m.imageUrl)}')">`
             : escapeHtml(m.message);
         return buildMsgHtml(
           isMe ? "me" : "them",
@@ -2231,10 +2307,10 @@ async function sendMsg() {
   const time = fmtTime(Date.now());
 
   if (hasPendingImg) {
-    const imgSrc = `${IMAGE_BASE}${window._pendingChatImg}`;
+    const imgSrcUrl = imgSrc(window._pendingChatImg);
     appendChatMsg(
       "me",
-      `<img src="${imgSrc}" class="chat-img-preview" onclick="openImg('${imgSrc}')">`,
+      `<img src="${imgSrcUrl}" class="chat-img-preview" onclick="openImg('${imgSrcUrl}')">`,
       time,
     );
     if (socket?.connected && currentChatUserId)
@@ -2295,6 +2371,7 @@ function handleChatTyping() {
   }, 1500);
 }
 
+/* ── handleChatImageUpload — updated to use imgSrc() ── */
 async function handleChatImageUpload(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -2312,7 +2389,7 @@ async function handleChatImageUpload(input) {
       const preview = document.getElementById("chatImgPreview");
       if (preview)
         preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-        <img src="${IMAGE_BASE}${data.urls[0]}" style="max-height:60px;border-radius:8px">
+        <img src="${imgSrc(data.urls[0])}" style="max-height:60px;border-radius:8px">
         <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
       </div>`;
       toast("✅ Image ready to send", "success");
@@ -2335,7 +2412,7 @@ function renderChatHeads() {
     .map(
       (w) => `
     <div class="chat-bubble" style="background:${w.color}" onclick="openChatPopup('${w.userId}','${escapeHtml(w.username)}')" title="${escapeHtml(w.username)}">
-      ${w.avatar ? `<img src="${IMAGE_BASE}${w.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : w.username.slice(0, 2).toUpperCase()}
+      ${w.avatar ? `<img src="${imgSrc(w.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : w.username.slice(0, 2).toUpperCase()}
       ${w.unread ? `<div class="unread-dot">${w.unread}</div>` : ""}
       <div style="position:absolute;bottom:2px;right:2px;width:10px;height:10px;border-radius:50%;background:${onlineUsers[w.userId] ? "var(--online)" : "var(--muted)"};border:2px solid var(--bg)"></div>
     </div>`,
@@ -2397,7 +2474,7 @@ async function doSearch(q) {
         (u) => `
       <div class="search-result-item" onclick="document.getElementById('searchResults').style.display='none';openUserProfile('${u._id}','${escapeHtml(u.username)}')">
         <div style="width:40px;height:40px;border-radius:50%;background:${hashColor(u.username || "")};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;overflow:hidden">
-          ${u.avatar ? `<img src="${IMAGE_BASE}${u.avatar}" style="width:100%;height:100%;object-fit:cover">` : (u.username || "U").slice(0, 2).toUpperCase()}
+          ${u.avatar ? `<img src="${imgSrc(u.avatar)}" style="width:100%;height:100%;object-fit:cover">` : (u.username || "U").slice(0, 2).toUpperCase()}
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px">${escapeHtml(u.username || "User")}</div>
@@ -2418,7 +2495,7 @@ async function doSearch(q) {
         (m) => `
       <div class="search-result-item" onclick="navigate('feed')">
         <div style="width:40px;height:40px;border-radius:8px;background:${hashColor(m.sellerName || "")};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0;overflow:hidden">
-          ${m.images?.length ? `<img src="${m.images[0].startsWith("http") ? m.images[0] : IMAGE_BASE + m.images[0]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : "🏷️"}
+          ${m.images?.length ? `<img src="${imgSrc(m.images[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : "🏷️"}
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px">${escapeHtml(m.title)}</div>
@@ -2463,6 +2540,7 @@ function closeModal() {
       'Click to upload photos (up to 5 images)<br><span style="color:var(--muted);font-size:12px">JPG, PNG, WebP · Max 5MB each</span>';
 }
 
+/* ── handleUpload — updated to accept full Cloudinary URLs ── */
 async function handleUpload(input) {
   if (!input.files?.length) return;
   const ui = document.getElementById("upIcon"),
@@ -2478,15 +2556,15 @@ async function handleUpload(input) {
       body: formData,
     });
     const data = await res.json();
-    if (data.urls) {
+    if (data.urls?.length) {
+      // FIX: Store URLs as returned (may be full Cloudinary https:// URLs)
       uploadedImageUrls = data.urls;
       if (ui) ui.textContent = "✅";
       if (ut) {
-        // Show mini previews
         const thumbs = data.urls
           .map(
             (u) =>
-              `<img src="${IMAGE_BASE}${u}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`,
+              `<img src="${imgSrc(u)}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`,
           )
           .join("");
         ut.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px">${thumbs}</div><div style="margin-top:6px;color:var(--green)">${input.files.length} photo(s) ready</div>`;
@@ -2716,7 +2794,7 @@ function syncUIToAuthState() {
     const el = document.getElementById(id);
     if (!el) return;
     if (avatar && !el.querySelector("img"))
-      el.innerHTML = `<img src="${IMAGE_BASE}${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      el.innerHTML = `<img src="${imgSrc(avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
     else if (!avatar && !el.querySelector("img")) el.textContent = initials;
   });
 
@@ -2806,6 +2884,7 @@ if (document.readyState === "complete" || document.readyState === "interactive")
 
 /* ── 32. EXPOSE GLOBALS ── */
 Object.assign(window, {
+  imgSrc,
   navigate,
   toast,
   openModal,
