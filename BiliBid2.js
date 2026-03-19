@@ -2308,30 +2308,101 @@ function handleChatTyping() {
 
 // FIX: handleChatImageUpload — reads full Cloudinary URL from urls[0]
 async function handleChatImageUpload(input) {
+  // Guard: nothing selected
   if (!input.files?.length) return;
+
+  const file = input.files[0];
+
+  // ── FIX B: Client-side MIME check ─────────────────────────────────────────
+  // Mirrors the server's fileFilter so the user gets instant feedback instead
+  // of a round-trip 400.  The regex intentionally matches every browser MIME
+  // variant we know the server accepts (see backend fix below).
+  const ALLOWED_TYPES = /^image\/(jpe?g|jpg|png|gif|webp|bmp|svg\+xml|heic|heif)$/i;
+  if (!ALLOWED_TYPES.test(file.type)) {
+    toast(`⚠️ Unsupported file type: ${file.type || "unknown"}. Use JPG, PNG, or WebP.`, "error");
+    return;
+  }
+
+  // Guard: 5 MB client-side limit matches the server's multer limit
+  const MAX_BYTES = 5 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    toast("⚠️ Image too large (max 5 MB).", "error");
+    return;
+  }
+
+  // ── FIX A: Build FormData with the EXACT field name the backend expects ────
+  // The backend's uploadImages.array("images", 5) listens for the key "images".
+  // Sending "image" (singular) would trigger LIMIT_UNEXPECTED_FILE → 400.
   const fd = new FormData();
-  fd.append("images", input.files[0]);
+  fd.append("images", file); // "images" must match backend uploadImages.array("images", …)
+
+  // Debug line — remove after confirming upload works
+  console.log("[handleChatImageUpload] Sending:", file.name, file.type, file.size, "bytes");
+
   toast("⏳ Uploading image…", "info");
+
   try {
+    // ── FIX A: Check token BEFORE the fetch call ───────────────────────────
+    // A missing token means authMiddleware returns 401, not 400, but it is
+    // still worth surfacing early to distinguish auth from upload failures.
+    const token = getToken();
+    if (!token) {
+      toast("⚠️ You must be logged in to send images.", "error");
+      return;
+    }
+
     const res = await fetch(`${API_BASE}/api/upload`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: {
+        // NOTE: Do NOT set Content-Type manually when sending FormData.
+        // The browser must set it automatically so the multipart boundary
+        // is included.  Setting it manually strips the boundary → multer
+        // cannot parse the body → req.files is empty → 400 "No files uploaded".
+        Authorization: `Bearer ${token}`,
+      },
       body: fd,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
 
+    // ── FIX A: Always read the response body, even on error ────────────────
+    // Previously: throw new Error(`HTTP ${res.status}`)  ← body discarded
+    // Now we parse JSON first so toast shows the real server message.
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      // Non-JSON body (e.g. an HTML error page from a proxy)
+      throw new Error(`Server returned HTTP ${res.status} with a non-JSON body`);
+    }
+
+    if (!res.ok) {
+      // data.message is now the meaningful string from multerErrorHandler or
+      // the route handler (e.g. "No files uploaded", "File too large", etc.)
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+
+    // ── SUCCESS PATH ──────────────────────────────────────────────────────
     if (data.urls?.length) {
-      window._pendingChatImg = data.urls[0]; // always full Cloudinary https:// URL
+      // data.urls[0] is always a full Cloudinary https:// URL
+      window._pendingChatImg = data.urls[0];
+
       const preview = document.getElementById("chatImgPreview");
-      if (preview)
-        preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-          <img src="${imgSrc(data.urls[0])}" style="max-height:60px;border-radius:8px">
-          <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
-        </div>`;
+      if (preview) {
+        preview.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+            <img src="${imgSrc(data.urls[0])}" style="max-height:60px;border-radius:8px">
+            <span
+              onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''"
+              style="cursor:pointer;color:var(--red);font-size:18px"
+            >✕</span>
+          </div>`;
+      }
       toast("✅ Image ready to send", "success");
-    } else throw new Error(data.message || "Upload failed");
+    } else {
+      throw new Error(data.message || "Upload returned no URLs");
+    }
+
   } catch (err) {
+    // Now err.message is meaningful: "File too large", "No files uploaded", etc.
     console.error("[handleChatImageUpload]", err.message);
     toast("⚠️ Image upload failed: " + err.message, "error");
   }
