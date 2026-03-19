@@ -1,3 +1,16 @@
+// ============================================================
+//  BiliBid — server.js  (FIXED PRODUCTION VERSION)
+//
+//  ROOT CAUSES FIXED:
+//  1. CloudinaryStorage import was WRONG (missing destructure)
+//     → caused ALL upload routes to 502
+//  2. No multer error-handling middleware → server crashed on
+//     file-size / type / Cloudinary failures
+//  3. Socket.IO had no server-level error handler → crash loops
+//  4. No Cloudinary env-var validation on startup → silent fail
+//  5. upload_stream used as fallback for resilience
+// ============================================================
+
 require("dotenv").config();
 
 const express = require("express");
@@ -9,36 +22,69 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const http = require("http");
 const { Server } = require("socket.io");
+const streamifier = require("streamifier"); // npm i streamifier
 
 // ── Cloudinary ────────────────────────────────────────────────
 const cloudinary = require("cloudinary").v2;
-const CloudinaryStorage = require("multer-storage-cloudinary");
+
+// ── FIX #5: Validate env vars on startup ─────────────────────
+const REQUIRED_ENV = [
+  "MONGO_URI",
+  "CLOUDINARY_CLOUD_NAME",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+];
+const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missingEnv.length) {
+  console.error(
+    "❌ Missing required environment variables:",
+    missingEnv.join(", "),
+  );
+  console.error("   Add them to your Render environment settings.");
+  process.exit(1);
+}
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
 });
+
+console.log(`☁️  Cloudinary configured: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+
+// ── FIX #1: CORRECT CloudinaryStorage import ─────────────────
+// WRONG (old code):  const CloudinaryStorage = require("multer-storage-cloudinary")
+// RIGHT: destructure the named export
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const app = express();
 const server = http.createServer(app);
 
 // ── Socket.IO ─────────────────────────────────────────────────
-// FIX: polling first so Render's reverse-proxy handshake succeeds,
-// then upgrades to WebSocket.  Ping settings prevent 30-s idle drop.
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["polling", "websocket"],
   pingInterval: 25_000,
   pingTimeout: 20_000,
+  connectTimeout: 45_000,
   allowEIO3: true,
+});
+
+// ── FIX #3: Socket.IO server-level error handler ─────────────
+io.engine.on("connection_error", (err) => {
+  console.error(
+    "[Socket] Engine connection error:",
+    err.req?.url,
+    err.code,
+    err.message,
+  );
 });
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "bilibid_secret_key";
 
 // ── CORS ──────────────────────────────────────────────────────
-// Accept a comma-separated FRONTEND_URL list, or fall back to "*"
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(",").map((s) => s.trim())
   : "*";
@@ -48,54 +94,81 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
 
-// NOTE: /uploads static route removed — files are now served from
-// Cloudinary's CDN, not from Render's ephemeral disk.
+// NOTE: No express.static("/uploads") — all files live on Cloudinary CDN.
 
-// ── Multer → Cloudinary storage ───────────────────────────────
-// All uploads go straight to Cloudinary.  req.files[n].path holds
-// the full https://res.cloudinary.com/... URL to store in MongoDB.
-
-const auctionImageStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "bilibid/auctions",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [{ quality: "auto", fetch_format: "auto" }],
-  },
-});
-
-const avatarStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "bilibid/avatars",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [
-      { width: 400, height: 400, crop: "fill", quality: "auto" },
-    ],
-  },
-});
-
-const storyImageStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "bilibid/stories",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [{ quality: "auto", fetch_format: "auto" }],
-  },
-});
+// ── FIX #1 + #2: Multer → memoryStorage (most resilient) ─────
+// Using memoryStorage + upload_stream gives us:
+//   • No disk I/O on Render's ephemeral filesystem
+//   • Full error control inside the route handler
+//   • Works even if CloudinaryStorage package version mismatches
+const memStorage = multer.memoryStorage();
 
 const uploadImages = multer({
-  storage: auctionImageStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: memStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 5 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpe?g|png|gif|webp)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Only image files (jpg, png, gif, webp) are allowed"));
+  },
 });
+
 const uploadAvatar = multer({
-  storage: avatarStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: memStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpe?g|png|gif|webp)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
 });
+
 const uploadStory = multer({
-  storage: storyImageStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: memStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpe?g|png|gif|webp)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
 });
+
+// ── Cloudinary upload helper (stream-based, no disk) ─────────
+function uploadToCloudinary(buffer, options = {}) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "image",
+        ...options,
+      },
+      (error, result) => {
+        if (error) {
+          console.error("[Cloudinary] upload_stream error:", error.message);
+          reject(error);
+        } else {
+          console.log("[Cloudinary] Upload success:", result.secure_url);
+          resolve(result);
+        }
+      },
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+}
+
+// ── FIX #2: Multer error-handling middleware ──────────────────
+// Must have 4 parameters — Express detects it as an error handler.
+function multerErrorHandler(err, req, res, next) {
+  if (err instanceof multer.MulterError) {
+    const messages = {
+      LIMIT_FILE_SIZE: "File too large (max 5 MB per file)",
+      LIMIT_FILE_COUNT: "Too many files (max 5)",
+      LIMIT_UNEXPECTED_FILE: "Unexpected field name in upload",
+    };
+    return res.status(400).json({ message: messages[err.code] || err.message });
+  }
+  if (err) {
+    // Custom fileFilter errors or Cloudinary errors
+    return res.status(400).json({ message: err.message || "Upload error" });
+  }
+  next();
+}
 
 // ── Auth middleware ───────────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -109,7 +182,7 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-/* ── MongoDB ── */
+// ── MongoDB ── ────────────────────────────────────────────────
 console.log("MONGO_URI:", process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"));
 mongoose.set("strictQuery", true);
 mongoose
@@ -126,7 +199,7 @@ mongoose
     process.exit(1);
   });
 
-/* ── SCHEMAS ── */
+// ── SCHEMAS ── ────────────────────────────────────────────────
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true },
@@ -354,62 +427,167 @@ async function createIndexes() {
   }
 }
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    DEBUG
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/debug", (req, res) => {
   res.json({
     db: mongoose.connection.db?.databaseName,
     host: mongoose.connection.host,
     readyState: mongoose.connection.readyState,
-    version: "v5.1-bilibid",
-    mongoUri: process.env.MONGO_URI?.replace(/:([^@]+)@/, ":***@"),
+    version: "v6.0-bilibid-fixed",
     cloudinary: process.env.CLOUDINARY_CLOUD_NAME || "not configured",
+    uploadsLocal: "DISABLED — Cloudinary only",
   });
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    ROOT
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "BiliBidMain.html"));
 });
 
-/* ══════════════════════════════
-   UPLOADS
-   Images are stored on Cloudinary.
-   The response returns full https:// URLs — no IMAGE_BASE prefix needed.
-══════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   UPLOAD ROUTES
+   All files go to Cloudinary via upload_stream.
+   Response always contains full https://res.cloudinary.com URLs.
+══════════════════════════════════════════════════════ */
 
-// General image upload (auction photos, chat images, story images)
-// Uses uploadImages storage (bilibid/auctions folder on Cloudinary)
+/**
+ * POST /api/upload
+ * General image upload for auctions / chat / stories.
+ * Accepts up to 5 images in the "images" field.
+ */
 app.post(
   "/api/upload",
   authMiddleware,
-  uploadImages.array("images", 5),
-  (req, res) => {
-    if (!req.files?.length)
+  (req, res, next) => {
+    // Run multer, then pass control to our error handler
+    uploadImages.array("images", 5)(req, res, (err) => {
+      if (err) return multerErrorHandler(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    console.log("[/api/upload] called, files:", req.files?.length ?? 0);
+
+    if (!req.files?.length) {
       return res.status(400).json({ message: "No files uploaded" });
-    // STEP 8: store full Cloudinary URL (file.path), not filename
-    const urls = req.files.map((f) => f.path);
-    res.json({ urls });
+    }
+
+    try {
+      const uploadPromises = req.files.map((file) =>
+        uploadToCloudinary(file.buffer, {
+          folder: "bilibid/auctions",
+          transformation: [{ quality: "auto", fetch_format: "auto" }],
+        }),
+      );
+
+      const results = await Promise.all(uploadPromises);
+      const urls = results.map((r) => r.secure_url);
+
+      console.log("[/api/upload] success, urls:", urls);
+      return res.json({ urls });
+    } catch (err) {
+      console.error("[/api/upload] Cloudinary error:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Image upload failed: " + err.message });
+    }
   },
 );
 
-// Profile picture upload (kept for backward compatibility)
+/**
+ * POST /api/upload/profile
+ * Profile picture upload (backward-compat alias).
+ */
 app.post(
   "/api/upload/profile",
   authMiddleware,
-  uploadAvatar.single("profilePic"),
-  (req, res) => {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-    res.json({ url: req.file.path });
+  (req, res, next) => {
+    uploadAvatar.single("profilePic")(req, res, (err) => {
+      if (err) return multerErrorHandler(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    console.log("[/api/upload/profile] called, file:", req.file?.originalname);
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: "bilibid/avatars",
+        transformation: [
+          { width: 400, height: 400, crop: "fill", quality: "auto" },
+        ],
+      });
+      console.log("[/api/upload/profile] success:", result.secure_url);
+      return res.json({ url: result.secure_url });
+    } catch (err) {
+      console.error("[/api/upload/profile] Cloudinary error:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Avatar upload failed: " + err.message });
+    }
   },
 );
 
-/* ══════════════════════════════
+/**
+ * POST /api/users/upload-avatar
+ * Primary avatar upload route used by the frontend.
+ * Accepts the file in the "avatar" field.
+ */
+app.post(
+  "/api/users/upload-avatar",
+  authMiddleware,
+  (req, res, next) => {
+    uploadAvatar.single("avatar")(req, res, (err) => {
+      if (err) return multerErrorHandler(err, req, res, next);
+      next();
+    });
+  },
+  async (req, res) => {
+    console.log(
+      "[/api/users/upload-avatar] called, file:",
+      req.file?.originalname,
+    );
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: "bilibid/avatars",
+        transformation: [
+          { width: 400, height: 400, crop: "fill", quality: "auto" },
+        ],
+      });
+
+      // Persist the Cloudinary URL to the user document
+      await User.findByIdAndUpdate(req.user.id, { avatar: result.secure_url });
+
+      console.log("[/api/users/upload-avatar] success:", result.secure_url);
+      return res.json({ avatarUrl: result.secure_url });
+    } catch (err) {
+      console.error(
+        "[/api/users/upload-avatar] Cloudinary error:",
+        err.message,
+      );
+      return res
+        .status(500)
+        .json({ message: "Avatar upload failed: " + err.message });
+    }
+  },
+);
+
+/* ══════════════════════════════════════════════════════
    AUTH
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -419,13 +597,6 @@ app.post("/api/register", async (req, res) => {
       return res
         .status(400)
         .json({ message: "Password must be at least 6 characters" });
-
-    console.log(
-      "[REGISTER] DB:",
-      mongoose.connection.db?.databaseName,
-      "host:",
-      mongoose.connection.host,
-    );
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing)
@@ -473,7 +644,6 @@ app.post("/api/login", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "7d" },
     );
-
     res.json({
       message: "Login successful",
       token,
@@ -546,9 +716,9 @@ app.put("/api/me/password", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    WALLET
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.post("/api/wallet/add", authMiddleware, async (req, res) => {
   try {
     const { amount, method } = req.body;
@@ -655,7 +825,6 @@ app.post("/api/wallet/withdraw", authMiddleware, async (req, res) => {
     const withdrawAmt = Number(amount);
     if (user.walletBalance < withdrawAmt)
       return res.status(400).json({ message: "Insufficient wallet balance" });
-
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: -withdrawAmt } },
@@ -692,9 +861,9 @@ app.get("/api/wallet/transactions", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    USERS
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/users", async (req, res) => {
   try {
     const { search } = req.query;
@@ -702,7 +871,6 @@ app.get("/api/users", async (req, res) => {
       ? { username: { $regex: search, $options: "i" } }
       : {};
     const users = await User.find(filter).select("-password -email").limit(10);
-
     const myId = req.headers.authorization
       ? (() => {
           try {
@@ -715,7 +883,6 @@ app.get("/api/users", async (req, res) => {
           }
         })()
       : null;
-
     res.json(
       users.map((u) => ({
         _id: u._id,
@@ -734,7 +901,6 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-/* GET suggested sellers — real users with most active listings */
 app.get("/api/users/suggested", async (req, res) => {
   try {
     const myId = req.headers.authorization
@@ -749,7 +915,6 @@ app.get("/api/users/suggested", async (req, res) => {
           }
         })()
       : null;
-
     const topSellers = await Auction.aggregate([
       { $match: { status: "active" } },
       {
@@ -762,12 +927,10 @@ app.get("/api/users/suggested", async (req, res) => {
       { $sort: { count: -1 } },
       { $limit: 5 },
     ]);
-
     const userIds = topSellers.map((s) => s._id);
     const users = await User.find({ _id: { $in: userIds } }).select(
       "-password -email",
     );
-
     res.json(
       users.map((u) => {
         const agg = topSellers.find(
@@ -795,7 +958,6 @@ app.get("/api/users/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password -email");
     if (!user) return res.status(404).json({ message: "User not found" });
-
     const myId = req.headers.authorization
       ? (() => {
           try {
@@ -808,7 +970,6 @@ app.get("/api/users/:id", async (req, res) => {
           }
         })()
       : null;
-
     const listingsCount = await Auction.countDocuments({ sellerId: user._id });
     res.json({
       _id: user._id,
@@ -828,11 +989,9 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
-/* Follow — accepts both ObjectId and username */
 app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
   try {
     let targetId = req.params.id;
-
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       const found = await User.findOne({
         username: { $regex: `^${targetId}$`, $options: "i" },
@@ -840,17 +999,13 @@ app.post("/api/users/:id/follow", authMiddleware, async (req, res) => {
       if (!found) return res.status(404).json({ message: "User not found" });
       targetId = found._id.toString();
     }
-
     if (targetId === req.user.id)
       return res.status(400).json({ message: "Cannot follow yourself" });
-
     const target = await User.findById(targetId);
     if (!target) return res.status(404).json({ message: "User not found" });
-
     const alreadyFollowing = target.followers.some(
       (f) => f.toString() === req.user.id,
     );
-
     if (alreadyFollowing) {
       await User.findByIdAndUpdate(targetId, {
         $pull: { followers: req.user.id },
@@ -894,28 +1049,9 @@ app.delete("/api/users/:id/follow", authMiddleware, async (req, res) => {
   }
 });
 
-/* Avatar upload — now goes to Cloudinary */
-app.post(
-  "/api/users/upload-avatar",
-  authMiddleware,
-  uploadAvatar.single("avatar"),
-  async (req, res) => {
-    try {
-      if (!req.file)
-        return res.status(400).json({ message: "No file uploaded" });
-      // file.path is the full Cloudinary URL
-      const avatarUrl = req.file.path;
-      await User.findByIdAndUpdate(req.user.id, { avatar: avatarUrl });
-      res.json({ avatarUrl });
-    } catch (err) {
-      res.status(500).json({ message: "Avatar upload failed" });
-    }
-  },
-);
-
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    AUCTIONS
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/auctions", async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, location, status, sellerId } =
@@ -931,9 +1067,7 @@ app.get("/api/auctions", async (req, res) => {
       if (minPrice) filter.currentBid.$gte = Number(minPrice);
       if (maxPrice) filter.currentBid.$lte = Number(maxPrice);
     }
-
     const auctions = await Auction.find(filter).sort({ createdAt: -1 });
-
     const now = Date.now();
     for (const auction of auctions) {
       if (auction.status === "active" && now > auction.endsAt) {
@@ -951,7 +1085,6 @@ app.get("/api/auctions", async (req, res) => {
         await auction.save();
       }
     }
-
     res.json(auctions);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch auctions" });
@@ -1007,9 +1140,7 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
     } = req.body;
     if (!title || !startingPrice || !duration)
       return res.status(400).json({ message: "Missing required fields" });
-
     const seller = await User.findById(req.user.id).select("avatar");
-
     const auction = await Auction.create({
       title,
       description: description || "",
@@ -1017,7 +1148,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       condition: condition || "",
       shipping: shipping || "",
       location: location || "",
-      // Images are now full Cloudinary URLs passed from the client
       images: images || [],
       startingPrice: Number(startingPrice),
       currentBid: Number(startingPrice),
@@ -1029,7 +1159,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
       sellerAvatar: seller?.avatar || "",
       bids: [],
     });
-
     await Notification.create({
       userId: req.user.id,
       type: "created",
@@ -1043,7 +1172,6 @@ app.post("/api/auctions", authMiddleware, async (req, res) => {
   }
 });
 
-/* PLACE BID with transaction recording */
 app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
   try {
     const { bidAmount } = req.body;
@@ -1055,18 +1183,15 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
       return res
         .status(400)
         .json({ message: "You cannot bid on your own auction" });
-
     const amount = Number(bidAmount);
     if (amount <= auction.currentBid)
       return res
         .status(400)
         .json({ message: `Bid must be higher than ₱${auction.currentBid}` });
-
     const bidder = await User.findById(req.user.id);
     if (!bidder) return res.status(404).json({ message: "User not found" });
     if (bidder.walletBalance < amount)
       return res.status(400).json({ message: "Insufficient wallet balance" });
-
     if (auction.bids.length > 0) {
       const lastBid = auction.bids[auction.bids.length - 1];
       const refundedUser = await User.findByIdAndUpdate(
@@ -1089,7 +1214,6 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
         message: `⚠️ You were outbid on "${auction.title}". New bid: ₱${amount}`,
       });
     }
-
     const updatedBidder = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: -amount } },
@@ -1104,7 +1228,6 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
       relatedAuctionId: auction._id,
       balanceAfter: updatedBidder.walletBalance,
     });
-
     auction.currentBid = amount;
     auction.bids.push({
       bidderId: req.user.id,
@@ -1113,13 +1236,11 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
       placedAt: new Date(),
     });
     await auction.save();
-
     await Notification.create({
       userId: auction.sellerId,
       type: "bid",
       message: `💰 ${req.user.username} bid ₱${amount} on "${auction.title}"`,
     });
-
     io.emit("bidPlaced", {
       auctionId: auction._id,
       currentBid: amount,
@@ -1133,7 +1254,6 @@ app.post("/api/auctions/:id/bid", authMiddleware, async (req, res) => {
   }
 });
 
-/* BUY NOW — emits auctionEnded so all clients remove it from feed */
 app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
@@ -1144,18 +1264,15 @@ app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "No Buy Now price set" });
     if (auction.sellerId.toString() === req.user.id)
       return res.status(400).json({ message: "Cannot buy your own auction" });
-
     const buyer = await User.findById(req.user.id);
     if (!buyer) return res.status(404).json({ message: "User not found" });
     if (buyer.walletBalance < auction.buyNowPrice)
       return res.status(400).json({ message: "Insufficient wallet balance" });
-
     const updatedBuyer = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { walletBalance: -auction.buyNowPrice } },
       { new: true },
     );
-
     await Transaction.create({
       userId: req.user.id,
       type: "debit",
@@ -1165,13 +1282,11 @@ app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
       relatedAuctionId: auction._id,
       balanceAfter: updatedBuyer.walletBalance,
     });
-
     auction.status = "ended";
     auction.winnerId = req.user.id;
     auction.winnerName = req.user.username;
     auction.currentBid = auction.buyNowPrice;
     await auction.save();
-
     await Notification.create({
       userId: auction.sellerId,
       type: "won",
@@ -1182,13 +1297,11 @@ app.post("/api/auctions/:id/buynow", authMiddleware, async (req, res) => {
       type: "won",
       message: `🎉 You bought "${auction.title}" for ₱${auction.buyNowPrice}!`,
     });
-
     io.emit("auctionEnded", {
       auctionId: auction._id.toString(),
       reason: "buynow",
       buyerName: req.user.username,
     });
-
     res.status(200).json({ message: "Purchase successful", auction });
   } catch (err) {
     console.error("Buy now error:", err);
@@ -1305,9 +1418,9 @@ app.put("/api/auctions/:id", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    MESSAGES
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1317,7 +1430,6 @@ const getConversations = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("senderId", "username avatar")
       .populate("receiverId", "username avatar");
-
     const convMap = {};
     for (const msg of messages) {
       const senderIdStr = msg.senderId?._id
@@ -1329,7 +1441,6 @@ const getConversations = async (req, res) => {
       const partner = senderIdStr === userId ? msg.receiverId : msg.senderId;
       const key = partner?._id ? partner._id.toString() : partner?.toString();
       if (!key) continue;
-
       if (!convMap[key]) {
         convMap[key] = {
           userId: partner._id || partner,
@@ -1382,7 +1493,6 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
     const { receiverId, message, messageType, imageUrl, location } = req.body;
     if (!receiverId)
       return res.status(400).json({ message: "Receiver required" });
-
     const msg = await Message.create({
       senderId: req.user.id,
       receiverId,
@@ -1392,40 +1502,50 @@ app.post("/api/messages", authMiddleware, async (req, res) => {
       imageUrl: imageUrl || "",
       location: location || null,
     });
-
     await Notification.create({
       userId: receiverId,
       type: "message",
       message: `💬 ${req.user.username} sent you a message`,
       link: `chat:${req.user.id}`,
     });
-
     const receiverSocketId = onlineUsers[receiverId];
-    if (receiverSocketId) {
+    if (receiverSocketId)
       io.to(receiverSocketId).emit("newMessage", {
         ...msg.toObject(),
         senderName: req.user.username,
         senderId: req.user.id,
       });
-    }
     res.status(201).json(msg);
   } catch (err) {
     res.status(500).json({ message: "Failed to send message" });
   }
 });
 
-// Image message upload — now uses Cloudinary
+/**
+ * POST /api/messages/image
+ * Chat image upload — uses memStorage + upload_stream
+ */
 app.post(
   "/api/messages/image",
   authMiddleware,
-  uploadImages.single("image"),
+  (req, res, next) => {
+    uploadImages.single("image")(req, res, (err) => {
+      if (err) return multerErrorHandler(err, req, res, next);
+      next();
+    });
+  },
   async (req, res) => {
     try {
       const { receiverId } = req.body;
       if (!receiverId || !req.file)
         return res.status(400).json({ message: "Receiver and image required" });
-      // file.path is the full Cloudinary URL
-      const imageUrl = req.file.path;
+
+      console.log("[/api/messages/image] uploading to Cloudinary...");
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: "bilibid/messages",
+      });
+      const imageUrl = result.secure_url;
+
       const msg = await Message.create({
         senderId: req.user.id,
         receiverId,
@@ -1442,14 +1562,15 @@ app.post(
         });
       res.status(201).json(msg);
     } catch (err) {
+      console.error("[/api/messages/image] error:", err.message);
       res.status(500).json({ message: "Failed to send image message" });
     }
   },
 );
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    REVIEWS
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 const submitReviewHandler = async (req, res) => {
   try {
     const targetUserId = req.params.userId || req.body.targetUserId;
@@ -1458,7 +1579,6 @@ const submitReviewHandler = async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     if (targetUserId === req.user.id)
       return res.status(400).json({ message: "Cannot review yourself" });
-
     const existing = await Review.findOne({
       reviewerId: req.user.id,
       targetUserId,
@@ -1468,7 +1588,6 @@ const submitReviewHandler = async (req, res) => {
       return res
         .status(400)
         .json({ message: "You already reviewed this user" });
-
     const review = await Review.create({
       reviewerId: req.user.id,
       reviewerName: req.user.username,
@@ -1505,9 +1624,9 @@ app.get("/api/reviews/:userId", async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    NOTIFICATIONS
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/notifications", authMiddleware, async (req, res) => {
   try {
     const notifs = await Notification.find({ userId: req.user.id })
@@ -1540,9 +1659,9 @@ app.put("/api/notifications/read-all", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    STORIES
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/stories", async (req, res) => {
   try {
     const stories = await Story.find({ expiresAt: { $gt: new Date() } })
@@ -1582,9 +1701,9 @@ app.post("/api/stories/:id/view", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    ANALYTICS
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.get("/api/analytics", authMiddleware, async (req, res) => {
   try {
     const myAuctions = await Auction.find({ sellerId: req.user.id });
@@ -1603,9 +1722,9 @@ app.get("/api/analytics", authMiddleware, async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
    ADMIN
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 app.delete("/api/auctions/reset", async (req, res) => {
   try {
     await Auction.deleteMany({});
@@ -1615,9 +1734,58 @@ app.delete("/api/auctions/reset", async (req, res) => {
   }
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
+   FIX #4: DATABASE MIGRATION ENDPOINT
+   Rewrites any remaining /uploads/... image URLs in
+   MongoDB to an empty string (or placeholder) so they
+   stop producing 404s.  Call once after deploy.
+   GET /api/admin/migrate-images?secret=YOUR_JWT_SECRET
+══════════════════════════════════════════════════════ */
+app.get("/api/admin/migrate-images", async (req, res) => {
+  if (req.query.secret !== JWT_SECRET)
+    return res.status(403).json({ message: "Forbidden" });
+
+  const LOCAL_PATTERN = /^\/uploads\//;
+  let fixed = { auctions: 0, users: 0 };
+
+  // Fix auction images
+  const auctions = await Auction.find({
+    images: { $elemMatch: { $regex: "^/uploads/" } },
+  });
+  for (const a of auctions) {
+    a.images = a.images
+      .map((img) => (LOCAL_PATTERN.test(img) ? "" : img))
+      .filter(Boolean);
+    await a.save();
+    fixed.auctions++;
+  }
+
+  // Fix auction sellerAvatar
+  await Auction.updateMany(
+    { sellerAvatar: { $regex: "^/uploads/" } },
+    { $set: { sellerAvatar: "" } },
+  );
+
+  // Fix user avatars
+  const users = await User.find({ avatar: { $regex: "^/uploads/" } });
+  for (const u of users) {
+    u.avatar = "";
+    await u.save();
+    fixed.users++;
+  }
+
+  // Fix story imageUrls
+  await Story.updateMany(
+    { imageUrl: { $regex: "^/uploads/" } },
+    { $set: { imageUrl: "" } },
+  );
+
+  res.json({ message: "Migration complete", fixed });
+});
+
+/* ══════════════════════════════════════════════════════
    SOCKET.IO
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 const onlineUsers = {};
 
 io.on("connection", (socket) => {
@@ -1670,29 +1838,43 @@ io.on("connection", (socket) => {
     },
   );
 
-  socket.on("typing", ({ to, from, username }) => {
-    io.to(to).emit("typing", { from, username });
-  });
-  socket.on("stopTyping", ({ to, from }) => {
-    io.to(to).emit("stopTyping", { from });
-  });
+  socket.on("typing", ({ to, from, username }) =>
+    io.to(to).emit("typing", { from, username }),
+  );
+  socket.on("stopTyping", ({ to, from }) =>
+    io.to(to).emit("stopTyping", { from }),
+  );
 
-  socket.on("disconnect", () => {
+  // FIX #3: catch errors inside socket handlers
+  socket.on("error", (err) =>
+    console.error("[Socket] socket error:", socket.id, err.message),
+  );
+
+  socket.on("disconnect", (reason) => {
     const userId = socket.userId;
     if (userId) {
       delete onlineUsers[userId];
       socket.broadcast.emit("userOffline", userId);
     }
-    console.log("🔌 Socket disconnected:", socket.id);
+    console.log("🔌 Socket disconnected:", socket.id, reason);
   });
 });
 
-/* ══════════════════════════════
+/* ══════════════════════════════════════════════════════
+   GLOBAL ERROR HANDLER
+   Catches unhandled errors from routes so the server
+   never crashes due to a single bad request.
+══════════════════════════════════════════════════════ */
+app.use((err, req, res, _next) => {
+  console.error("[Global Error Handler]", req.method, req.path, err.message);
+  if (res.headersSent) return;
+  res.status(500).json({ message: err.message || "Internal server error" });
+});
+
+/* ══════════════════════════════════════════════════════
    START
-══════════════════════════════ */
+══════════════════════════════════════════════════════ */
 server.listen(PORT, () => {
   console.log(`🚀 BiliBid server running on port ${PORT}`);
-  console.log(
-    `☁️  Cloudinary cloud: ${process.env.CLOUDINARY_CLOUD_NAME || "⚠️  not configured"}`,
-  );
+  console.log(`☁️  Cloudinary cloud: ${process.env.CLOUDINARY_CLOUD_NAME}`);
 });

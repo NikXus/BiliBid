@@ -1,55 +1,45 @@
 // ============================================================
-//  BiliBid2.js  v5.1
-//  Fixes: guest mode, photo collage, buy-now feed removal,
-//  real suggested sellers, messaging usernames, logout reset
+//  BiliBid2.js  v6.0  — FIXED PRODUCTION VERSION
 //
-//  CHANGES from v5.0:
-//    1. [FIX] Socket: transport order changed to polling-first so
-//       the initial handshake succeeds through Render's proxy,
-//       then upgrades to WebSocket.  Ping interval added to
-//       keep the connection alive past Render's 30-s idle timeout.
-//
-//    2. [FIX] Images: IMAGE_BASE prefix is no longer prepended to
-//       URLs that are already absolute (Cloudinary URLs start with
-//       https://).  A helper imgSrc() handles this transparently
-//       so no template changes are needed in the rest of the code.
-//
-//    3. [FIX] Fallback image shown whenever an <img> fails to load,
-//       so broken-image icons never appear in the UI.
-//
-//    4. [MINOR] Upload response now accepts either the old relative
-//       path format OR the new full Cloudinary URL format.
+//  Changes from v5.1:
+//  1. imgSrc() unchanged — already correct (handles both
+//     absolute Cloudinary URLs and legacy relative paths)
+//  2. handleUpload() now reads response.urls[0] which is the
+//     full Cloudinary secure_url — no IMAGE_BASE prepend needed
+//  3. uploadAvatar() reads response.avatarUrl (not .url fallback
+//     that could be a relative path)
+//  4. handleChatImageUpload() reads secure_url correctly
+//  5. handleStoryImgUpload() reads secure_url correctly
+//  6. All fetch() calls have try/catch with meaningful toasts
+//  7. Socket reconnection config hardened
+//  8. Removed IMAGE_BASE prepending from upload responses
 // ============================================================
 "use strict";
 
 /* ── 1. CONFIG ── */
-const API_BASE   = "https://bilibid-1.onrender.com";
+const API_BASE = "https://bilibid-1.onrender.com";
 const SOCKET_URL = "https://bilibid-1.onrender.com";
-// IMAGE_BASE is kept for backward-compatibility with any relative
-// paths still stored in older MongoDB documents.  New uploads via
-// Cloudinary return full https:// URLs and do NOT need this prefix.
+// IMAGE_BASE: used ONLY for legacy /uploads/... paths still in DB.
+// All NEW uploads return full https:// Cloudinary URLs — no prefix needed.
 const IMAGE_BASE = "https://bilibid-1.onrender.com";
 
-/* ── 1a. IMAGE HELPER ───────────────────────────────────────────
-   Returns a fully-qualified image URL regardless of whether the
-   stored value is:
-     • a Cloudinary URL   "https://res.cloudinary.com/..."
-     • an absolute URL    "https://example.com/..."
-     • a legacy path      "/uploads/abc.jpg"
-────────────────────────────────────────────────────────────── */
+/* ── 1a. IMAGE HELPER ────────────────────────────────────────
+   Pass ANY stored image value. Returns a fully-qualified URL.
+   • "https://res.cloudinary.com/..." → returned as-is ✅
+   • "https://bilibid-1.onrender.com/..." → returned as-is ✅
+   • "/uploads/abc.jpg" → prepends IMAGE_BASE (legacy compat)
+   • "" / null / undefined → returns ""
+──────────────────────────────────────────────────────────── */
 function imgSrc(path) {
   if (!path) return "";
-  // Already a full URL — use as-is
-  if (/^https?:\/\//i.test(path)) return path;
-  // Legacy relative path — prepend IMAGE_BASE
-  return IMAGE_BASE + path;
+  if (/^https?:\/\//i.test(path)) return path; // already absolute
+  return IMAGE_BASE + path; // legacy relative path
 }
 
-/* ── 1b. GLOBAL IMG FALLBACK ────────────────────────────────────
-   Attach once to <body>.  Any <img> that fails to load anywhere
-   in the app gets replaced with an SVG placeholder — no broken
-   image icons ever visible to the user.
-────────────────────────────────────────────────────────────── */
+/* ── 1b. GLOBAL IMG FALLBACK ─────────────────────────────────
+   Any <img> that fails to load gets replaced with an SVG
+   placeholder so broken-image icons never appear.
+──────────────────────────────────────────────────────────── */
 document.addEventListener(
   "error",
   (e) => {
@@ -64,19 +54,19 @@ document.addEventListener(
       "font-family='sans-serif' fill='%2364748b'%3E%F0%9F%8F%B7%EF%B8%8F%3C/text%3E" +
       "%3C/svg%3E";
   },
-  true // capture phase — fires before bubbling so it catches every img
+  true, // capture phase — fires before bubbling
 );
 
 /* ── 2. AUTH HELPERS ── */
-const getToken    = () => localStorage.getItem("bbToken")    || "";
-const getUserId   = () => localStorage.getItem("bbUserId")   || "";
+const getToken = () => localStorage.getItem("bbToken") || "";
+const getUserId = () => localStorage.getItem("bbUserId") || "";
 const getUsername = () => localStorage.getItem("bbUsername") || "";
 
 function setAuth(token, id, username, avatar = "") {
-  localStorage.setItem("bbToken",    token);
-  localStorage.setItem("bbUserId",   id);
+  localStorage.setItem("bbToken", token);
+  localStorage.setItem("bbUserId", id);
   localStorage.setItem("bbUsername", username);
-  localStorage.setItem("bbAvatar",   avatar);
+  localStorage.setItem("bbAvatar", avatar);
 }
 function clearAuth() {
   ["bbToken", "bbUserId", "bbUsername", "bbAvatar"].forEach((k) =>
@@ -131,21 +121,9 @@ function initSocket() {
   }
 
   socket = io(SOCKET_URL, {
-    // ── FIX: polling first, then upgrade to WebSocket ────────
-    // Render's reverse proxy requires the HTTP polling handshake
-    // to succeed before a WebSocket upgrade is attempted.
-    // The OLD order ["websocket", "polling"] caused the timeout
-    // because the raw WS upgrade was dropped by the proxy on cold
-    // connections before the session was established.
-    transports: ["polling", "websocket"],
-
-    // ── Keepalive — prevents Render's 30-s idle disconnect ───
-    // Socket.io's client-side ping fires every 25 s so the server
-    // always sees activity before the 30-s window expires.
-    // These MUST align with the server's pingInterval/pingTimeout.
+    transports: ["polling", "websocket"], // polling first (Render proxy requirement)
     pingInterval: 25_000,
-    pingTimeout:  20_000,
-
+    pingTimeout: 20_000,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1_500,
@@ -181,7 +159,6 @@ function initSocket() {
       );
   });
 
-  /* Remove bought auction from everyone's feed */
   socket.on("auctionEnded", ({ auctionId, reason, buyerName }) => {
     const idx = cachedPosts.findIndex((p) => p._id === auctionId);
     if (idx !== -1) {
@@ -583,6 +560,8 @@ function closePostStory() {
   const pi = document.getElementById("storyImgPreview");
   if (pi) pi.innerHTML = "";
 }
+
+// FIX: Story image upload — reads secure_url from response
 async function handleStoryImgUpload(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -593,17 +572,22 @@ async function handleStoryImgUpload(input) {
       headers: { Authorization: `Bearer ${getToken()}` },
       body: fd,
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+
+    // data.urls[0] is always a full Cloudinary https:// URL
     if (data.urls?.length) {
-      uploadedStoryUrl = data.urls[0]; // now a full Cloudinary URL
+      uploadedStoryUrl = data.urls[0];
       const pi = document.getElementById("storyImgPreview");
       if (pi)
         pi.innerHTML = `<img src="${imgSrc(uploadedStoryUrl)}" style="max-width:200px;border-radius:12px;margin-top:10px">`;
-    }
-  } catch {
-    toast("⚠️ Image upload failed", "error");
+    } else throw new Error(data.message || "Upload failed");
+  } catch (err) {
+    console.error("[handleStoryImgUpload]", err.message);
+    toast("⚠️ Image upload failed: " + err.message, "error");
   }
 }
+
 async function submitStory() {
   const text = document.getElementById("storyText")?.value?.trim() || "";
   if (!text && !uploadedStoryUrl) {
@@ -637,8 +621,6 @@ async function submitStory() {
 /* ── 10. FEED ── */
 async function loadFeed() {
   const c = document.getElementById("postsContainer");
-
-  /* Guest mode: show login prompt, no auctions */
   if (!getToken()) {
     cachedPosts = [];
     if (c)
@@ -708,13 +690,9 @@ function renderFeed() {
   c.innerHTML = cachedPosts.map(buildPost).join("");
 }
 
-/* ── Photo collage builder ── */
 function buildPhotoCollage(images) {
   if (!images?.length)
     return `<span style="font-size:64px;line-height:240px">🏷️</span>`;
-
-  // FIX: use imgSrc() so Cloudinary URLs are used as-is, legacy
-  // paths still get the IMAGE_BASE prefix automatically.
   const srcs = images.slice(0, 5).map(imgSrc);
   const n = srcs.length;
   const extra = images.length - 5;
@@ -723,25 +701,12 @@ function buildPhotoCollage(images) {
     `<img src="${src}" ${openFn(src)} style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;${style}" onerror="this.style.display='none'">`;
 
   if (n === 1) return img(srcs[0]);
-
   if (n === 2)
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;height:240px;gap:2px">
-    ${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}
-  </div>`;
-
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;height:240px;gap:2px">${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}</div>`;
   if (n === 3)
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px">
-    <div style="grid-row:span 2;overflow:hidden">${img(srcs[0])}</div>
-    <div style="overflow:hidden">${img(srcs[1])}</div>
-    <div style="overflow:hidden">${img(srcs[2])}</div>
-  </div>`;
-
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px"><div style="grid-row:span 2;overflow:hidden">${img(srcs[0])}</div><div style="overflow:hidden">${img(srcs[1])}</div><div style="overflow:hidden">${img(srcs[2])}</div></div>`;
   if (n === 4)
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px">
-    ${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}
-  </div>`;
-
-  // 5+
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:240px;gap:2px">${srcs.map((s) => `<div style="overflow:hidden">${img(s)}</div>`).join("")}</div>`;
   return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:140px 100px;height:240px;gap:2px">
     <div style="grid-column:span 2;overflow:hidden">${img(srcs[0])}</div>
     <div style="overflow:hidden">${img(srcs[1])}</div>
@@ -767,10 +732,7 @@ function buildPost(p) {
         )
       : 0;
   const comments = p.comments || [];
-
   const collage = buildPhotoCollage(p.images);
-
-  // FIX: use imgSrc() for seller avatar as well
   const avContent = p.sellerAvatar
     ? `<img src="${imgSrc(p.sellerAvatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
     : (p.sellerName || "S").slice(0, 2).toUpperCase();
@@ -799,12 +761,7 @@ function buildPost(p) {
         </div>
       </div>
     </div>
-
-    <div class="post-product-img" style="height:auto;min-height:${p.images?.length > 1 ? "auto" : "240px"}">
-      ${collage}
-      ${ending ? '<div class="img-overlay" style="position:absolute;top:12px;right:12px"><div class="live-dot"></div>Ending Soon!</div>' : ""}
-    </div>
-
+    <div class="post-product-img" style="height:auto;min-height:${p.images?.length > 1 ? "auto" : "240px"}">${collage}${ending ? '<div class="img-overlay" style="position:absolute;top:12px;right:12px"><div class="live-dot"></div>Ending Soon!</div>' : ""}</div>
     <div class="post-body">
       <div class="post-title">${escapeHtml(p.title)}</div>
       <div class="post-desc">${escapeHtml(p.description || "")}</div>
@@ -820,7 +777,7 @@ function buildPost(p) {
           <div>
             <div class="bid-label">Current Bid</div>
             <div class="bid-amount" id="ba-${p._id}">₱${bid.toLocaleString()}</div>
-            <div class="bid-count" id="bc-${p._id}">${bids} bids${watched ? " · 👁️ Watching" : ""}</div>
+            <div class="bid-count"  id="bc-${p._id}">${bids} bids${watched ? " · 👁️ Watching" : ""}</div>
           </div>
           <div>
             <div class="bid-label">Time Left</div>
@@ -842,19 +799,15 @@ function buildPost(p) {
         ${p.buyNowPrice ? `<button class="bid-btn gold-btn" onclick="buyNow('${p._id}',${p.buyNowPrice})" style="white-space:nowrap">⚡ Buy ₱${p.buyNowPrice.toLocaleString()}</button>` : ""}
       </div>
     </div>
-
     <div class="post-actions">
       <button class="post-action${liked ? " liked" : ""}" id="like-${p._id}" onclick="doLike('${p._id}')">❤️ <span id="lc-${p._id}">${p.likes?.length || 0}</span></button>
       <button class="post-action" onclick="toggleComments('${p._id}')">💬 <span id="cc-${p._id}">${comments.length}</span> Comments</button>
       <button class="post-action${watched ? " watching" : ""}" id="wbtn-${p._id}" onclick="doWatch('${p._id}')">👁️ ${watched ? "Watching" : "Watch"}</button>
       <button class="post-action" onclick="doShare('${p._id}')">↗️ Share</button>
     </div>
-
     <div class="comments-section" id="cmts-${p._id}">
       <div class="comment-input-row">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--gold));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0">
-          ${getUsername().slice(0, 2).toUpperCase() || "ME"}
-        </div>
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--gold));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0">${getUsername().slice(0, 2).toUpperCase() || "ME"}</div>
         <input class="comment-input" id="cin-${p._id}" placeholder="Write a comment…" onkeydown="if(event.key==='Enter')addComment('${p._id}')">
         <button class="comment-send" onclick="addComment('${p._id}')">➤</button>
       </div>
@@ -985,14 +938,11 @@ async function buyNow(pid, price) {
         toast("⚠️ " + res.message, "error");
         return;
       }
-
-      /* Remove from local feed immediately */
       const idx = cachedPosts.findIndex((p) => p._id === pid);
       if (idx !== -1) {
         cachedPosts.splice(idx, 1);
         renderFeed();
       }
-
       toast("🎉 Purchased! Check Won Auctions.", "success");
       walletBal = Math.max(0, walletBal - price);
       syncWalletDisplay();
@@ -1235,10 +1185,7 @@ function renderUserProfileReviews(targetUserId, reviews, avg) {
     "⭐".repeat(Math.round(n)) + "☆".repeat(Math.max(0, 5 - Math.round(n)));
   let html = "";
   if (avg > 0)
-    html += `<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:14px;border:1px solid var(--border);text-align:center">
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:32px;color:var(--gold)">${avg.toFixed(1)}</div>
-    <div style="font-size:14px">${stars(avg)}</div><div style="font-size:11px;color:var(--muted2)">${reviews.length} reviews</div></div>`;
-
+    html += `<div style="background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:14px;border:1px solid var(--border);text-align:center"><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:32px;color:var(--gold)">${avg.toFixed(1)}</div><div style="font-size:14px">${stars(avg)}</div><div style="font-size:11px;color:var(--muted2)">${reviews.length} reviews</div></div>`;
   if (!reviews.length)
     html +=
       '<div style="color:var(--muted2);font-size:13px;text-align:center;padding:16px">No reviews yet.</div>';
@@ -1361,10 +1308,7 @@ function renderMyAuct(tab) {
   const c = document.getElementById("myAuctContent");
   if (!c) return;
   if (!items.length) {
-    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)">
-      <div style="font-size:48px;margin-bottom:12px">📦</div><div>No ${tab} listings yet.</div>
-      <button class="btn-submit" style="margin-top:16px" onclick="openModal()">＋ Post Auction</button>
-    </div>`;
+    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">📦</div><div>No ${tab} listings yet.</div><button class="btn-submit" style="margin-top:16px" onclick="openModal()">＋ Post Auction</button></div>`;
     return;
   }
   c.innerHTML = items
@@ -1374,14 +1318,11 @@ function renderMyAuct(tab) {
       const bidCnt = item.bids?.length || 0;
       let actions = "";
       if (tab === "active")
-        actions = `<button class="listing-action-btn" onclick="editAuction('${item._id}')">✏️ Edit</button>
-      <button class="listing-action-btn" onclick="toast('📊 ${bidCnt} bids on this item','info')">📊 ${bidCnt} Bids</button>
-      <button class="listing-action-btn danger" onclick="deleteAuction('${item._id}',${i})">🗑️ Delete</button>`;
+        actions = `<button class="listing-action-btn" onclick="editAuction('${item._id}')">✏️ Edit</button><button class="listing-action-btn" onclick="toast('📊 ${bidCnt} bids on this item','info')">📊 ${bidCnt} Bids</button><button class="listing-action-btn danger" onclick="deleteAuction('${item._id}',${i})">🗑️ Delete</button>`;
       else if (tab === "ended")
         actions = `<button class="listing-action-btn" onclick="openModal()">🔄 Relist</button>`;
       else
-        actions = `<button class="listing-action-btn" onclick="openTracking('${item._id}')">📦 Track</button>
-      <button class="listing-action-btn" onclick="openUserProfile('${item.winnerId || ""}','${escapeHtml(item.winnerName || "Winner")}')">⭐ Review Buyer</button>`;
+        actions = `<button class="listing-action-btn" onclick="openTracking('${item._id}')">📦 Track</button><button class="listing-action-btn" onclick="openUserProfile('${item.winnerId || ""}','${escapeHtml(item.winnerName || "Winner")}')">⭐ Review Buyer</button>`;
       return `<div class="card" style="display:flex;gap:14px;align-items:center;padding:14px">
       <div style="width:56px;height:56px;border-radius:12px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden">
         ${item.images?.length ? `<img src="${imgSrc(item.images[0])}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : "🏷️"}
@@ -1460,10 +1401,7 @@ function renderWatchlist() {
   const c = document.getElementById("watchlistContent");
   if (!c) return;
   if (!watchItems.length) {
-    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)">
-      <div style="font-size:48px;margin-bottom:12px">👁️</div><div>No items in watchlist.</div>
-      <button class="btn-submit" style="margin-top:16px" onclick="navigate('feed')">Browse Auctions</button>
-    </div>`;
+    c.innerHTML = `<div class="card" style="text-align:center;color:var(--muted2)"><div style="font-size:48px;margin-bottom:12px">👁️</div><div>No items in watchlist.</div><button class="btn-submit" style="margin-top:16px" onclick="navigate('feed')">Browse Auctions</button></div>`;
     return;
   }
   c.innerHTML = watchItems
@@ -1809,8 +1747,7 @@ function renderPaymentMethodSelect(type) {
       : type === "send"
         ? '<option value="BiliBid Wallet">BiliBid Wallet</option><option value="GCash">GCash</option><option value="Maya">Maya</option>'
         : '<option value="GCash">GCash</option><option value="Maya">Maya</option><option value="BDO Bank">BDO Bank</option><option value="BPI Bank">BPI Bank</option>';
-  wrap.innerHTML = `<div class="form-group"><label class="form-label">Payment Method</label>
-    <select class="form-select" id="wmMethod" onchange="updateWalletExtraFields('${type}',this.value)">${options}</select></div>`;
+  wrap.innerHTML = `<div class="form-group"><label class="form-label">Payment Method</label><select class="form-select" id="wmMethod" onchange="updateWalletExtraFields('${type}',this.value)">${options}</select></div>`;
   updateWalletExtraFields(type, type === "send" ? "BiliBid Wallet" : "GCash");
 }
 
@@ -1822,18 +1759,13 @@ function updateWalletExtraFields(type, method) {
     if (method === "GCash" || method === "Maya")
       html = `<div class="form-group"><label class="form-label">${method} Number</label><input class="form-input" id="wmPhone" placeholder="09XX XXX XXXX" maxlength="11"></div>`;
     else if (method === "Credit Card")
-      html = `<div class="form-group"><label class="form-label">Card Number</label><input class="form-input" id="wmCardNum" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCardNum(this)"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group"><label class="form-label">Expiry</label><input class="form-input" id="wmExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)"></div>
-        <div class="form-group"><label class="form-label">CVV</label><input class="form-input" id="wmCvv" placeholder="XXX" maxlength="4" type="password"></div>
-      </div>`;
+      html = `<div class="form-group"><label class="form-label">Card Number</label><input class="form-input" id="wmCardNum" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCardNum(this)"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="form-group"><label class="form-label">Expiry</label><input class="form-input" id="wmExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)"></div><div class="form-group"><label class="form-label">CVV</label><input class="form-input" id="wmCvv" placeholder="XXX" maxlength="4" type="password"></div></div>`;
     else
       html = `<div class="form-group"><label class="form-label">Account Number</label><input class="form-input" id="wmBankNum" placeholder="Account number"></div>`;
   } else if (type === "send") {
     html = `<div class="form-group"><label class="form-label">${method === "BiliBid Wallet" ? "Recipient Username" : method + " Number"}</label><input class="form-input" id="wmRecip" placeholder="${method === "BiliBid Wallet" ? "@username" : "09XX XXX XXXX"}"></div>`;
   } else {
-    html = `<div class="form-group"><label class="form-label">${method.includes("Bank") ? "Account Number" : method + " Number"}</label><input class="form-input" id="wmPhone" placeholder="${method.includes("Bank") ? "Account number" : "09XX XXX XXXX"}"></div>
-      <div class="form-group"><label class="form-label">Account Name</label><input class="form-input" id="wmAcctName" placeholder="Full name"></div>`;
+    html = `<div class="form-group"><label class="form-label">${method.includes("Bank") ? "Account Number" : method + " Number"}</label><input class="form-input" id="wmPhone" placeholder="${method.includes("Bank") ? "Account number" : "09XX XXX XXXX"}"></div><div class="form-group"><label class="form-label">Account Name</label><input class="form-input" id="wmAcctName" placeholder="Full name"></div>`;
   }
   extra.innerHTML = html;
 }
@@ -1898,11 +1830,9 @@ async function processWallet() {
       document.getElementById("wmPhone")?.value?.trim() ||
       document.getElementById("wmBankNum")?.value?.trim() ||
       "";
-    const accountName =
-      document.getElementById("wmAcctName")?.value?.trim() || "";
     const res = await apiFetch("/wallet/withdraw", {
       method: "POST",
-      body: JSON.stringify({ amount: amt, method, accountNumber, accountName }),
+      body: JSON.stringify({ amount: amt, method, accountNumber }),
     });
     if (!res) return;
     if (res.message && res.walletBalance === undefined) {
@@ -1929,9 +1859,7 @@ async function loadSuggestedSellers() {
   if (!c) return;
   const data = await apiFetch("/users/suggested");
   if (!Array.isArray(data) || !data.length) {
-    c.innerHTML = `<div style="background:var(--surface2);border-radius:14px;padding:14px;border:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--muted2)">No sellers yet — post the first auction!</div>
-    </div>`;
+    c.innerHTML = `<div style="background:var(--surface2);border-radius:14px;padding:14px;border:1px solid var(--border)"><div style="font-size:12px;color:var(--muted2)">No sellers yet — post the first auction!</div></div>`;
     return;
   }
   c.innerHTML = data
@@ -2056,9 +1984,9 @@ function renderReviews(reviews, avg) {
 }
 
 async function saveProfile() {
-  const bio = document.getElementById("editBio")?.value || "",
-    location = document.getElementById("editLocation")?.value || "",
-    username = document.getElementById("editName")?.value || "";
+  const bio = document.getElementById("editBio")?.value || "";
+  const location = document.getElementById("editLocation")?.value || "";
+  const username = document.getElementById("editName")?.value || "";
   const res = await apiFetch("/me", {
     method: "PUT",
     body: JSON.stringify({ bio, location, username }),
@@ -2072,7 +2000,7 @@ async function saveProfile() {
   }
 }
 
-/* ── uploadAvatar — updated to use imgSrc() ── */
+// FIX: uploadAvatar — always reads .avatarUrl (full Cloudinary URL)
 async function uploadAvatar(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -2084,23 +2012,30 @@ async function uploadAvatar(input) {
       headers: { Authorization: `Bearer ${getToken()}` },
       body: fd,
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
     const data = await res.json();
-    const rawUrl = data.avatarUrl || data.url;
-    if (rawUrl) {
-      uploadedAvatarUrl = rawUrl;
-      const url = imgSrc(rawUrl); // handles both absolute and relative
-      const imgs = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-      ["profileAvatarLarge", "sidebarAvatarText", "topbarAvatar"].forEach(
-        (id) => {
-          const el = document.getElementById(id);
-          if (el) el.innerHTML = imgs;
-        },
-      );
-      localStorage.setItem("bbAvatar", rawUrl);
-      toast("✅ Avatar updated!", "success");
-    } else throw new Error("No URL returned");
+
+    // Server always returns { avatarUrl: "https://res.cloudinary.com/..." }
+    const rawUrl = data.avatarUrl;
+    if (!rawUrl) throw new Error("No avatar URL returned from server");
+
+    uploadedAvatarUrl = rawUrl;
+    const url = imgSrc(rawUrl); // imgSrc handles absolute URLs correctly
+    const imgs = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    ["profileAvatarLarge", "sidebarAvatarText", "topbarAvatar"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = imgs;
+      },
+    );
+    localStorage.setItem("bbAvatar", rawUrl);
+    toast("✅ Avatar updated!", "success");
   } catch (err) {
-    toast("⚠️ Avatar upload failed", "error");
+    console.error("[uploadAvatar]", err.message);
+    toast("⚠️ Avatar upload failed: " + err.message, "error");
   }
 }
 
@@ -2371,7 +2306,7 @@ function handleChatTyping() {
   }, 1500);
 }
 
-/* ── handleChatImageUpload — updated to use imgSrc() ── */
+// FIX: handleChatImageUpload — reads full Cloudinary URL from urls[0]
 async function handleChatImageUpload(input) {
   if (!input.files?.length) return;
   const fd = new FormData();
@@ -2383,19 +2318,22 @@ async function handleChatImageUpload(input) {
       headers: { Authorization: `Bearer ${getToken()}` },
       body: fd,
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+
     if (data.urls?.length) {
-      window._pendingChatImg = data.urls[0];
+      window._pendingChatImg = data.urls[0]; // always full Cloudinary https:// URL
       const preview = document.getElementById("chatImgPreview");
       if (preview)
         preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-        <img src="${imgSrc(data.urls[0])}" style="max-height:60px;border-radius:8px">
-        <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
-      </div>`;
+          <img src="${imgSrc(data.urls[0])}" style="max-height:60px;border-radius:8px">
+          <span onclick="window._pendingChatImg=null;this.parentElement.parentElement.innerHTML=''" style="cursor:pointer;color:var(--red);font-size:18px">✕</span>
+        </div>`;
       toast("✅ Image ready to send", "success");
-    }
-  } catch {
-    toast("⚠️ Image upload failed", "error");
+    } else throw new Error(data.message || "Upload failed");
+  } catch (err) {
+    console.error("[handleChatImageUpload]", err.message);
+    toast("⚠️ Image upload failed: " + err.message, "error");
   }
 }
 
@@ -2540,24 +2478,33 @@ function closeModal() {
       'Click to upload photos (up to 5 images)<br><span style="color:var(--muted);font-size:12px">JPG, PNG, WebP · Max 5MB each</span>';
 }
 
-/* ── handleUpload — updated to accept full Cloudinary URLs ── */
+// FIX: handleUpload — reads data.urls[] which are always full Cloudinary https:// URLs
 async function handleUpload(input) {
   if (!input.files?.length) return;
   const ui = document.getElementById("upIcon"),
     ut = document.getElementById("upText");
   if (ui) ui.textContent = "⏳";
   if (ut) ut.textContent = "Uploading…";
+
   const formData = new FormData();
   Array.from(input.files).forEach((f) => formData.append("images", f));
+
   try {
     const res = await fetch(`${API_BASE}/api/upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${getToken()}` },
       body: formData,
     });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || `HTTP ${res.status}`);
+    }
+
     const data = await res.json();
+
     if (data.urls?.length) {
-      // FIX: Store URLs as returned (may be full Cloudinary https:// URLs)
+      // data.urls are full Cloudinary https:// URLs — store exactly as returned
       uploadedImageUrls = data.urls;
       if (ui) ui.textContent = "✅";
       if (ut) {
@@ -2570,10 +2517,11 @@ async function handleUpload(input) {
         ut.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px">${thumbs}</div><div style="margin-top:6px;color:var(--green)">${input.files.length} photo(s) ready</div>`;
       }
       toast("✅ Photos uploaded!", "success");
-    } else throw new Error(data.message || "Upload failed");
+    } else throw new Error(data.message || "Upload failed — no URLs returned");
   } catch (err) {
+    console.error("[handleUpload]", err.message);
     if (ui) ui.textContent = "⚠️";
-    if (ut) ut.textContent = "Upload failed — images skipped.";
+    if (ut) ut.textContent = "Upload failed — " + err.message;
     uploadedImageUrls = [];
     toast("⚠️ " + err.message, "error");
   }
@@ -2716,8 +2664,6 @@ function logout() {
     () => {
       clearAuth();
       disconnectSocket();
-
-      /* Reset all state */
       walletBal = 0;
       notifs = [];
       cachedPosts = [];
@@ -2737,11 +2683,9 @@ function logout() {
       chatWindows = [];
       followedUsers = {};
       onlineUsers = {};
-
       updateNB();
       renderChatHeads();
       closeChat();
-
       [
         "topbarAvatar",
         "sidebarAvatarText",
@@ -2763,9 +2707,8 @@ function logout() {
       if (sno)
         sno.innerHTML =
           '<div style="font-size:12px;color:var(--muted2);padding:8px">No notifications yet.</div>';
-
       syncUIToAuthState();
-      navigate("feed"); // will show guest prompt since token is cleared
+      navigate("feed");
       toast("👋 Logged out. See you soon!", "info");
     },
   );
@@ -2777,7 +2720,6 @@ function syncUIToAuthState() {
     username = getUsername() || "",
     avatar = localStorage.getItem("bbAvatar") || "";
   const initials = username.slice(0, 2).toUpperCase() || "??";
-
   const loggedIn = document.getElementById("loggedInActions"),
     loggedOut = document.getElementById("loggedOutActions");
   if (loggedIn) loggedIn.style.display = token ? "flex" : "none";
@@ -2858,7 +2800,6 @@ async function appInit() {
   syncUIToAuthState();
   updateNB();
   renderChatHeads();
-
   if (getToken()) {
     initSocket();
     const me = await apiFetch("/me");
@@ -2874,7 +2815,6 @@ async function appInit() {
     ]);
     syncUIToAuthState();
   }
-
   await loadFeed();
 }
 
